@@ -1,0 +1,41 @@
+{% extends 'base_analysis.html' %}
+{%block title%}
+<h1> line plot </h1>
+{%endblock%}
+
+{% block main %}
+<a href="{% url 'analysis_map' %}">Back to map</a>
+
+    <!-- <div style="width: 500px;"><canvas id="dimensions"></canvas></div><br/> -->
+    canvas!!
+    <canvas id="myChart" width="800px" height="250px" style="border-style: solid;"></canvas>
+   
+     canvas!!
+     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const ctx = document.getElementById('myChart');
+
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: ['Red', 'Blue', 'Yellow', 'Green', 'Purple', 'Orange'],
+    datasets: [{
+      label: '# of Votes',
+      data: [12, 19, 3, 5, 2, 3],
+      borderWidth: 1
+    }]
+  },
+  options: {
+    scales: {
+      y: {
+        beginAtZero: true
+      },
+      x:{
+        ticks:{stepSize: 0.5,}
+      }
+    }
+  }
+});
+        
+    </script>
+{%endblock%}

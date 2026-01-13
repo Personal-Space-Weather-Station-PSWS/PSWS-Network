@@ -1,0 +1,387 @@
+{% extends 'base_analysis.html' %}
+{% block main %}
+<div class="container">
+<table>
+<tr> 
+	<form id="plotStationsForm" action="/analysis/analysis/" method="POST">
+		{% csrf_token %}
+        <label for="start">Start date: </label>
+        <input type="datetime-local" id="start_datetime" name="start_datetime" value="{{ selected_date|default:'2025-03-01T00:00' }}"
+        min="1988-06-07T00:00" max="2099-06-14T00:00"/>
+        <button type="submit" class="button"><span>Plot Stations</span></button>
+	</form>
+	
+	<form id="displayGraphsForm" action="{% url 'display_graphs' %}" method="POST">
+		{% csrf_token %}
+		<input type="hidden" name="startDatetime" id="startDatetimeInput">
+		<input type="hidden" name="stationIds" id="stationIdsInput">
+		<button type="submit" class="button"><span>Display Graphs</span></button>
+	</form>
+		
+</tr>
+</table>
+</div>
+
+{% if show_map %}
+	<div id='map' style='width: 100%; height: 500px; display: block;'></div>
+{% endif %}
+
+<script>
+	let selectedStations = [];
+
+	document.getElementById('plotStationsForm').addEventListener('submit', function(event) {
+    	// pull data from the visible field
+    	const userDate = document.getElementById('start_datetime').value;
+    	// store date
+ 		document.getElementById('startDatetimeInput').value = userDate;
+    	// store station ids
+	    document.getElementById('stationIdsInput').value = JSON.stringify(selectedStations);
+	});
+
+	document.getElementById('displayGraphsForm').addEventListener('submit', function(event) {
+    	// pull data from the visible field
+    	const userDate = document.getElementById('start_datetime').value;
+    	// store date
+ 		document.getElementById('startDatetimeInput').value = userDate;
+    	// store station ids
+		document.getElementById('stationIdsInput').value = JSON.stringify(selectedStations);
+  	});
+		
+	{% if date_stations %}
+    	mapboxgl.accessToken = '{{ mapbox_access_token }}';
+    	var map = new mapboxgl.Map({
+    	    container: 'map',
+	        style: 'mapbox://styles/mapbox/streets-v11',
+        	center: [-87.0, 33.0],
+        	zoom: 3.25
+    	});
+
+		// add markers to map
+    	var geojson = {
+    	    type: 'FeatureCollection',
+	        features: [
+            	{% for station in date_stations %}
+        	    {
+    	            type: 'Feature',
+	                geometry: {
+                    	type: 'Point',
+                	    coordinates: [{{ station.longitude }}, {{ station.latitude }}]
+            	    },
+        	        properties: {
+    	                title: '{{ station.nickname }}',
+	                    URL: 'station_analysis/',
+                    	ID: '{{ station.id }}'
+                	}
+            	},
+            	{% endfor %}
+        	]
+    	};
+
+	    geojson.features.forEach(function(marker) {
+  			const mapMarker = new mapboxgl.Marker({
+    			color: '#008000',
+    			scale: 0.6
+  			})
+    		.setLngLat(marker.geometry.coordinates)
+    		.setPopup(
+      			new mapboxgl.Popup({ offset: 25 })
+        		.setHTML('<h3><a href="' + marker.properties.URL + marker.properties.ID + '">' + marker.properties.title + '</a></h3>')
+		    )
+    		.addTo(map);
+  
+  			// get element, attach click to toggle color & selection
+  			let isSelected = false;
+  			mapMarker.getElement().addEventListener('click', () => {
+    			isSelected = !isSelected;
+    			if (isSelected) {
+      				// change marker svg path fill to orange
+      				mapMarker.getElement().querySelector('svg path').style.fill = '#FFA500';
+				      selectedStations.push(marker.properties.ID);
+    			} else {
+      				// switch marker color back to green
+      				mapMarker.getElement().querySelector('svg path').style.fill = '#008000';
+      				const index = selectedStations.indexOf(marker.properties.ID);
+      				if (index > -1) {
+        				selectedStations.splice(index, 1);
+      				}
+    			}
+  			});
+		});
+
+		alert('{{ message}}');
+	{% endif %}
+</script>
+
+{% endblock %}
+
+{% block bottom %}
+<tr>
+	<div id="line_plot">
+		{% if datasets == None  %}
+		<div style="position:flex;top: 20px; background-color: rgb(208, 227, 233); padding-top: 10px; padding-bottom: 10px;"><p>{{message}}</p>
+		
+		</div>
+		{% else %}
+			
+			<h4 id='alldata'></h4>
+			{{ datasets |json_script:"datasets"}}
+			<div style="align-content: center;"><h2>HamSCI Magnetometer</h2>
+				<p> selected dates: {{start}}, {{end}}</p>
+				<p>This data plots have been window averaged by every 60s.</p> </div>
+			{% for data in datasets %}
+				{% if data.ts|length > 1 %}
+			
+				<canvas id="lineplot{{ forloop.counter }}" width="800" height="200"></canvas>
+				<div>change y scale to: 
+					<button onClick="updateScales('{{ forloop.counter }}',1)">1</button>
+					<button onClick="updateScales('{{ forloop.counter }}',10)">10</button>
+					<button onClick="updateScales('{{ forloop.counter }}',100)">100</button>
+				</div>
+				 
+					{%else%}
+					<div><canvas hidden  id="lineplot{{ forloop.counter }}" width="800" height="10"></canvas></div>
+				{%endif%}
+			{% endfor %} 
+
+			{% for data in datasets %}
+				{% if data.ts|length < 1 %}
+				
+				<div>{{data.station_name}} does not have an observation in selected period.</div>
+				{%endif%}
+
+				
+			{% endfor %} 
+		{% endif %}
+	</div>
+</tr>
+</table>
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.0/chartjs-plugin-zoom.min.js" integrity="sha512-B6F98QATBNaDHSE7uANGo5h0mU6fhKCUD+SPAY7KZDxE8QgZw9rewDtNiu3mbbutYDWOKT3SPYD8qDBpG2QnEg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<script>
+	
+	function get_info(){
+		// var start_date = document.querySelector('input[id="start_datetime"]').value;
+		// var end_date = document.querySelector('input[id="end_date"]').value;
+		// var start_time = document.querySelector('input[id="start_time"]').value;
+		// var end_time = document.querySelector('input[id="end_time"]').value;
+		var ids=[]
+		
+		var checkedBoxes = document.querySelectorAll('input[type="checkbox"]:checked');
+		for(var i=0; i<checkedBoxes.length; i++){
+				ids.push(checkedBoxes[i].id);
+		}
+		console.log(checkedBoxes);
+	
+	}
+
+	function availability(value) {
+		const element=document.getElementById('test');
+		// const element2=document.getElementById("switch_station");
+		
+		var str;
+		if(value=="all"){
+			str="mag_stations";
+		}
+		if(value=="online"){
+			str="online_stations";
+		}if(value=="PossiblyOnline"){
+			str="possiblyonline_stations";
+		}if(value=="Offline"){
+			str="offline_stations";
+		}
+		element.innerHTML=str;
+		//element2.innerHTML="{% for station in "+str+" %}<div>{% if forloop.counter0|divisibleby:4  %} <tr>  {%endif%}<td><input class='form' type='checkbox' name='{{station.nickname}}' id='{{station.id}}'  value='{{station.nickname}}' onclick='show_select()''><label for ='station'>{{station.nickname}}</label></td></div>{%endfor%} ";
+		}
+
+          
+    function show_select() {
+      var node_list = document.getElementsByTagName('input');
+      var count=0;
+        for (var i = 0; i < node_list.length; i++) {
+            var node = node_list[i];
+            if (node.getAttribute('type') == 'checkbox' && node.checked == true) {
+               count+=1;
+            }
+        }
+        const element=document.getElementById('selectednumber');
+        element.innerHTML=count+ " of {{mag_stations.count}} is selected";
+    
+    }
+	function selectAll(){
+         	var items=document.querySelectorAll('input[type="checkbox"]');
+         	for(var i=0; i<items.length; i++){
+         		items[i].checked=true;
+         	}
+         }
+         
+	function UnSelectAll(){
+		var items=document.querySelectorAll('input[type="checkbox"]');
+		for(var i=0; i<items.length; i++){
+			items[i].checked=false;
+		}
+	}	
+
+
+	function updateScales(chart_id,num) {
+		var id=parseInt(chart_id)-1;
+		charts[id].options.scales.y={
+			
+			title:{
+				display:true,
+				text: 'B(nT)'
+			},
+			min:-num,
+			max:num,
+				
+		}
+		charts[id].update();
+		}
+
+	//get data from response and make chart with chartjs
+if(document.getElementById('datasets')){
+	charts=[]
+	const datasets = JSON.parse(document.getElementById('datasets').textContent);
+	for (let i=0;i<datasets.length;i++){
+		var index=i+1;
+		var showx=false;
+		var n=datasets[i].ts.length;
+		let ts = new Array(n); for (let j=0; j<n; ++j) ts[j] = '     ';  //this only show empty for x except the last one
+		if(i==datasets.length-1){
+			showx=true;
+			var times = []; // dummy time array
+			var tt = 0; 	
+			//loop to increment the time and push results in array
+			var days=n/24/60;
+			for(var k=0;k<days;k++){
+				for (var j=0;tt<24*60; j++) {
+					var hh = Math.floor(tt/60); // getting hours of day in 0-24 format
+					var mm = (tt%60); // getting minutes of the hour in 0-55 format
+					var hours=['00','06','12','18','23'];
+					var m=(("0" + mm).slice(-2));
+					var h=(("0" + (hh % 24)).slice(-2));
+					
+					if( (m.includes('00')) && (hours.includes(h))){
+						times[k+j] = ("0" + (hh % 24)).slice(-2) + ':' + ("0" + mm).slice(-2); 
+						
+					}
+					else{
+						times[k+j]='';
+					}
+					tt = tt + 1;
+					if(times.length==n){break;}
+				}
+
+				if(times.length==n){break;}
+			}
+			ts=times;
+		}
+		var ctx = document.getElementById('lineplot'+index.toString()).getContext('2d');
+		var myChart = new Chart(ctx, {
+			type: 'line',
+			data:{
+				// labels : datasets[i].ts,
+				labels : ts,
+				datasets: [{
+					label: "x",
+					data :datasets[i].xs,
+					borderColor: 'red',
+					borderWidth: 0.3,
+					tension: 0.1,
+					fill: false,
+					pointRadius: 0.5,
+					},
+					{
+					label: "y",
+					data :datasets[i].ys,
+					borderColor: "black",
+					tension: 0.1,
+					borderWidth: 0.3,
+					fill: false,
+					pointRadius: 0.5,
+					},
+					{
+					label: "z",
+					data :datasets[i].zs,
+					borderWidth: 0.3,
+					tension: 0.1,
+					borderColor: "blue",
+					fill: false,
+					pointRadius: 0.5,
+					}]
+			},
+		options:{
+			responsive:true,
+			scales: {
+				x:{
+					title:{
+						display:showx,
+						text:'time'
+					},
+					ticks:{ 
+						maxRotation:0, 
+						autoSkip:false,
+						align: 'center',
+						},
+					grid: {
+						display: false,
+						drawOnChartArea: true,
+						drawTicks: true,
+						}
+				},
+				y:{
+					title:{
+						display:true,
+						text: 'B(nT)'
+					},
+					min:-100,
+					max:100,
+				}
+				},
+			plugins:{
+				legend: {
+					display: true,
+					position:'right',
+					labels:{
+						usePointStyle:true,
+						pointStyle:'line'
+					}
+					},
+			title:{
+				display:true,
+				text: datasets[i].station_name+', '+ datasets[i].station_address,
+			},
+			zoom: {
+				pan:{
+					enabled:true,
+					mode: 'xy',
+					
+				},
+				zoom: {
+					wheel: {
+						enabled: true,
+					},
+					pinch: {
+						enabled: true
+					},
+					mode: 'xy',
+					}
+			}
+		}
+		},
+		
+		
+	
+});
+	charts[i]=myChart;
+	};
+	
+}
+			
+  
+</script>
+
+
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+{% block main %}
+
+{% if messages %}
+<ul class="messages">
+    {% for message in messages %}
+    <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+<div>
+	{% if user.is_authenticated %}
+	<ul class="Menu">
+		<li><a href="/home">Home</a></li>
+		<li><a href="/stations/stations">Stations</a></li>
+		<li><a href="/observations/observation_list">Observations</a></li>
+		<li><a href="/analysis/analysis">Analysis</a></li>
+		<li><a href="/user_list">Users</a></li>
+		<li>
+			<form method="post" action="{% url 'logout' %}" style="display: inline;">
+				{% csrf_token %}
+				<button type="submit" style="background: none; border: none; color: white; text-align: center; padding: 14px 16px; text-decoration: none; display: block; cursor: pointer; font-family: inherit; font-size: inherit;">Log Out</button>
+			</form>
+		</li>
+		<li><a href="/signup/">Register your station</a></li>
+		<li><a class="active" href="{% url 'profile' %}">{{ request.user.username }}</a></li>
+		<li style="float:right"><a href="/about/">About</a></li>
+	</ul>
+	{% else %}
+	<ul class="Menu">
+		<li><a href="/home">Home</a></li>
+		<li><a href="/stations/stations">Stations</a></li>
+		<li><a href="/observations/observation_list">Observations</a></li>
+		<li><a href="/analysis/analysis">Analysis</a></li>
+		<li><a href="/user_list">Users</a></li>
+		<li><a href="/login/">Log In</a></li>
+		<li><a href="/signup/">Register your station</a></li>
+		<li style="float:right"><a href="/about/">About</a></li>
+	</ul>
+	{% endif %}
+</div>
+
+<div class="main">
+	<br>
+	<h4>Profile</h4>
+	<p>Username: {{ request.user.username }}</p>
+	<p>Email: {{ request.user.profile.email }}</p>
+	<br>
+	<h4>Edit Profile: </h4>
+	<br>
+	<form method='POST' enctype="multipart/form-data">
+		{% csrf_token %}
+		{{ p_form|crispy }}
+		<button class="btn btn-primary" type='submit'>Update</button>
+	</form>
+</div>
+
+{% endblock %}

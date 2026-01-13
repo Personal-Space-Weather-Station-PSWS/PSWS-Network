@@ -1,0 +1,267 @@
+{% extends 'base.html' %}
+{% block main %}
+
+<div>
+
+	{% if user.is_authenticated %}
+	<ul class="Menu">
+		<li><a class="active" href="/home">Home</a></li>
+		<li><a href="/stations/stations">Stations</a></li>
+		<li><a href="/observations/observation_list">Observations</a></li>
+		<li><a href="/analysis/analysis">Analysis</a></li>
+		<li><a href="/user_list">Users</a></li>
+		<li>
+			<form method="post" action="{% url 'logout' %}" style="display: inline;">
+				{% csrf_token %}
+				<button type="submit" style="background: none; border: none; color: white; text-align: center; padding: 14px 16px; text-decoration: none; display: block; cursor: pointer; font-family: inherit; font-size: inherit;">Log Out</button>
+			</form>
+		</li>
+		<li><a href="/signup/">Register your station</a></li>
+		<li><a href="{% url 'profile' %}">{{ request.user.username }}</a></li>
+		<li style="float:right"><a href="/about/">About</a></li>
+	</ul>
+	{% else %}
+	<ul class="Menu">
+		<li><a class="active" href="/home">Home</a></li>
+		<li><a href="/stations/stations">Stations</a></li>
+		<li><a href="/observations/observation_list">Observations</a></li>
+		<li><a href="/analysis/analysis">Analysis</a></li>
+		<li><a href="/user_list">Users</a></li>
+		<li><a href="/login/">Log In</a></li>
+		<li><a href="/signup/">Register your station</a></li>
+		<li style="float:right"><a href="/about/">About</a></li>
+	</ul>
+	{% endif %}
+</div>
+<tr></tr>
+<br>
+
+<style>
+    /* Map container styling */
+	.map-container {
+	    margin: 20px;
+	    height: calc(100vh - 150px); /* full height minus navbar/header */
+	    position: relative;
+	}
+
+	#map {
+	    width: 100%;
+	    height: 100%;
+	    min-height: 400px; /* guarantee it's never tiny */
+	    border-radius: 8px;
+	}
+
+    .map-overlay {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        background: #fff;
+        margin-right: 20px;
+        font-family: Arial, sans-serif;
+        overflow: auto;
+        border-radius: 3px;
+    }
+
+    #legend {
+        padding: 10px;
+        box-shadow: 0 1px 2px rgb(0 0 0 / 10%);
+        line-height: 18px;
+        width: 120px;
+    }
+
+    .legend-key {
+        display: inline-block;
+        border-radius: 50%;
+        width: 12px;
+        height: 12px;
+        margin-right: 5px;
+    }
+
+    #legend div {
+        margin-bottom: 5px;
+    }
+</style>
+
+<!-- Map container to hold the map and ensure it respects header space -->
+<div class="map-container">
+    <div id="map">
+        <div id="legend" style="position: absolute; bottom: 30px; right: 10px; background-color: white; padding: 10px; border: 1px solid black; border-radius: 3px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); z-index: 1;">
+            <h4 style="margin: 0 0 10px; font-weight: bold;"><a href="/about#legend-info">Legend</a></h4>
+        </div>
+    </div>
+</div>
+
+<script>
+  mapboxgl.accessToken = '{{mapbox_access_token}}' ;
+  var map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/streets-v11',
+    center: [-87.0, 33.0],
+    zoom: 3.25
+  });
+
+  //Online
+  var geojson_online = {
+	  type: 'FeatureCollection',
+	  features: [
+		  {% for i in online_stations %}
+		  	{
+				type: 'Feature',
+				geometry: {
+					type: 'Point',
+					coordinates: [{{ i.longitude }}, {{ i.latitude }}]
+				},
+				properties: {
+					title: '{{ i.nickname }}',
+					URL: 'station_analysis/',
+					ID: '{{ i.id }}'
+				}
+			},
+		  {% endfor %}
+	  ]
+  };
+  // add markers to map
+
+  geojson_online.features.forEach(function(marker) {
+	//var el = document.createElement('div');
+	//el.className = 'marker-light-red';
+	  new mapboxgl.Marker({ color: "#008000", scale: .6 })//el)
+	  .setLngLat(marker.geometry.coordinates)
+	  .setPopup(new mapboxgl.Popup({ offset: 25 })
+	  //.setHTML('<h3>' + marker.properties.title + '</h3>'))
+	  .setHTML('<h3><a href="' + marker.properties.URL + marker.properties.ID + '">' + marker.properties.title + '</a></h3>'))
+	  .addTo(map);
+  });
+
+  //PossiblyOnline
+  var geojson_poss = {
+	  type: 'FeatureCollection',
+	  features: [
+		  {% for i in possiblyonline_stations %}
+		  	{
+				type: 'Feature',
+				geometry: {
+					type: 'Point',
+					coordinates: [{{ i.longitude }}, {{ i.latitude }}]
+				},
+				properties: {
+					title: '{{ i.nickname }}',
+					URL: 'station_analysis/',
+					ID: '{{ i.id }}'
+				}
+			},
+		  {% endfor %}
+	  ]
+  };
+  // add markers to map
+  geojson_poss.features.forEach(function(marker) {
+	//var el = document.createElement('div');
+	//el.className = 'marker-light-red';
+	  new mapboxgl.Marker({ color: "#FFA500", scale: .6})//el)
+	  .setLngLat(marker.geometry.coordinates)
+	  .setPopup(new mapboxgl.Popup({ offset: 25 })
+	  //.setHTML('<h3>' + marker.properties.title + '</h3>'))
+	  .setHTML('<h3><a href="' + marker.properties.URL + marker.properties.ID + '">' + marker.properties.title + '</a></h3>'))
+	  .addTo(map);
+  });
+
+
+  //Offline
+  var geojson_offline = {
+	  type: 'FeatureCollection',
+	  features: [
+		  {% for i in offline_stations %}
+		  	{
+				type: 'Feature',
+				geometry: {
+					type: 'Point',
+					coordinates: [{{ i.longitude }}, {{ i.latitude }}]
+				},
+				properties: {
+					title: '{{ i.nickname }}',
+					URL: 'station_analysis/',
+					ID: '{{ i.id }}'
+				}
+			},
+		  {% endfor %}
+	  ]
+  };
+  // add markers to map
+  geojson_offline.features.forEach(function(marker) {
+	//var el = document.createElement('div');
+	//el.className = 'marker-light-red';
+	  new mapboxgl.Marker({ color: "#FF0000", scale: .6 })//el)
+	  .setLngLat(marker.geometry.coordinates)
+	  .setPopup(new mapboxgl.Popup({ offset: 25 })
+	  //.setHTML('<h3>' + marker.properties.title + '</h3>'))
+	  .setHTML('<h3><a href="' + marker.properties.URL + marker.properties.ID + '">' + marker.properties.title + '</a></h3>')) 
+	  .addTo(map);
+  });
+
+//Retired
+  var geojson_retired = {
+	  type: 'FeatureCollection',
+	  features: [
+		  {% for i in retired_stations %}
+		  	{
+				type: 'Feature',
+				geometry: {
+					type: 'Point',
+					coordinates: [{{ i.longitude }}, {{ i.latitude }}]
+				},
+				properties: {
+					title: '{{ i.nickname }}',
+					URL: 'station_analysis/',
+					ID: '{{ i.id }}'
+				}
+			},
+		  {% endfor %}
+	  ]
+  };
+  // add markers to map
+  geojson_retired.features.forEach(function(marker) {
+	//var el = document.createElement('div');
+	//el.className = 'marker-light-red';
+	  new mapboxgl.Marker({ color: "#808080", scale: .5 })//el)
+	  .setLngLat(marker.geometry.coordinates)
+	  .setPopup(new mapboxgl.Popup({ offset: 25 })
+	  .setHTML('<h3><a href="' + marker.properties.URL + marker.properties.ID + '">' + marker.properties.title + '</a></h3>'))
+	  .addTo(map);
+  });
+
+  map.on('load', () => {
+    const layers = [
+          'Online',
+          'Possibly Offline',
+          'Offline',
+          'Retired'
+        ];
+        const colors = [
+          '#008000',
+          '#FFA500',
+          '#FF0000',
+          '#808080'
+        ];
+
+        // create legend
+        const legend = document.getElementById('legend');
+
+        layers.forEach((layer, i) => {
+          const color = colors[i];
+          const item = document.createElement('div');
+          const key = document.createElement('span');
+          key.className = 'legend-key';
+          key.style.backgroundColor = color;
+
+          const value = document.createElement('span');
+          value.innerHTML = `${layer}`;
+          item.appendChild(key);
+          item.appendChild(value);
+          legend.appendChild(item);
+        });
+   
+  });
+</script>
+ 
+
+{% endblock %}

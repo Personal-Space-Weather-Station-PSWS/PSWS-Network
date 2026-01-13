@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+{% extends 'base_observations.html' %}
+
+{% block title %}
+<h1 class="text-center">Observations</h1>
+{% endblock title %}
+
+{% block main %}
+
+{% load render_table from django_tables2 %}
+
+<style>
+    .obsTable {
+        margin-left: auto;
+        margin-right: auto;
+        width: 100%;
+        max-width: 1200px;    
+        border: 5px solid black;
+    }
+
+    .obsTable th {
+        border-bottom: 2px solid #dcdde0;
+    }
+
+    .obsTable tr {
+        border-bottom: 1px solid #dcdde0;
+    }
+
+    /* Responsive filter form styling */
+    .filter-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: center;
+        margin: 20px auto;
+        max-width: 1200px;
+        width: 90%; /* 90% width for responsiveness */
+    }
+
+    .filter-form form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .filter-form input[type="submit"],
+    .filter-form input[type="reset"],
+    .filter-form button {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        background-color: #04AA6D;
+        color: white;
+        border-radius: 3px;
+        cursor: pointer;
+        margin-right: 80px; /* Adds space between buttons */
+    }
+
+    .filter-form input[type="reset"],
+    .filter-form button {
+        background-color: #ddd;
+        color: #333;
+    }
+
+    .filter-form input[type="submit"]:hover,
+    .filter-form input[type="reset"]:hover,
+    .filter-form button:hover {
+        background-color: #ccc;
+    }
+
+    /* Responsive adjustments for smaller screens */
+    @media (max-width: 768px) {
+        .filter-form {
+            flex-direction: column;
+        }
+
+        .filter-form form {
+            flex-direction: column;
+        }
+
+        .filter-form input[type="submit"],
+        .filter-form input[type="reset"],
+        .filter-form button {
+            width: 100%; /* Full width buttons on smaller screens */
+        }
+    }
+</style>
+</head>
+
+<body>
+<div id="main">
+    <!-- Filter form above the table -->
+    <div class="filter-form">
+        <form action="" method="get" class="form-inline">
+            {{ filter.form.as_p }}
+            
+            <!-- Submit button to apply filters -->
+            <input type="submit" value="Filter" />
+
+            <a href="/observations/observation_list/">Clear Filters</a>
+        </form>
+    </div>
+
+    <p>To download observation data, click on File/Observation link. Please be patient, it may take a while to zip a large observation.</p>
+
+    <table class="obsTable">
+        {% render_table table %}
+    </table>
+
+    <div class="pagination">
+        <span class="step-links">
+            {% if page_obj.has_previous %}
+                <a href="?page=1">&laquo; first</a>
+
+                <!-- Jump back by 5 pages -->
+                {% if page_obj.number > 5 %}
+                    <a href="?page={{ page_obj.number|add:"-5" }}">back 5</a>
+                {% endif %}
+
+                <a href="?page={{ page_obj.previous_page_number }}">previous</a>
+            {% endif %}
+
+            <span class="current">
+                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+            </span>
+
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}">next</a>
+
+                <!-- Jump forward by 5 pages -->
+                {% if page_obj.number|add:"5" <= page_obj.paginator.num_pages %}
+                    <a href="?page={{ page_obj.number|add:"5" }}">forward 5</a>
+                {% endif %}
+
+                <a href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a>
+            {% endif %}
+        </span>
+    </div>
+</div>
+
+
+</body>
+
+{% endblock main %}
+
+</html>
+

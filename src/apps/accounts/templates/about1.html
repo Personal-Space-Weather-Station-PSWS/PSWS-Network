@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block main %}
+
+{% if user.is_authenticated %}
+<ul class="Menu">
+	<li><a href="/home">Home</a></li>
+	<li><a href="/stations/stations">Stations</a></li>
+	<li><a href="/observations/observation_list">Observations</a></li>
+	<li><a href="/analysis/analysis">Analysis</a></li>
+	<li><a href="/user_list">Users</a></li>
+	<li>
+		<form method="post" action="{% url 'logout' %}" style="display: inline;">
+			{% csrf_token %}
+			<button type="submit" style="background: none; border: none; color: white; text-align: center; padding: 14px 16px; text-decoration: none; display: block; cursor: pointer; font-family: inherit; font-size: inherit;">Log Out</button>
+		</form>
+	</li>
+	<li><a href="/signup/">Register your station</a></li>
+	<li><a href="{% url 'profile' %}">{{ request.user.username }}</a></li>
+	<li class="active" style="float:right"><a href="/about/">About</a></li>
+  </ul>
+{% else %}
+<ul class="Menu">
+  <li><a href="/home">Home</a></li>
+  <li><a href="/stations/stations">Stations</a></li>
+  <li><a href="/observations/observation_list">Observations</a></li>
+  <li><a href="/analysis/analysis">Analysis</a></li>
+  <li><a href="/user_list">Users</a></li>
+  <li><a href="/login/">Log In</a></li>
+  <li><a href="/signup/">Register your station</a></li>
+  <li class="active" style="float:right"><a href="/about/">About</a></li>
+</ul>
+{% endif %}
+
+<div class="card">
+	<div class="card-body">
+		<h4 class="card-title">About the Personal Space Weather Network (PSWN)</h4>
+		<p>About the Personal Space Weather Network</p>
+		<p>The mission of the Personal Space Weather Network (PSWN) is twofold:</p>
+		<p>- To crowd-source collection of radio spectrum data that can be used for ionospheric research</p>
+		<p>- To provide a useful instrument for radio amateurs (hams) and shortwave listeners(SWLs) that they can use to observe radio propagation conditions at their location</p>
+		<p>The PSWN consists of this Central Control System (CCS) and a number of software-defined radios (SDRs) that collect data and upload what they collect to CCS.&nbsp; Two SDRs have been designed for radio spectrum data collection:</p>
+		<p>The Grape (two versions) &ndash; a low cost SDR that collects spectrum around one frequency (version 1) or up to 4 frequencies (version 2) &ndash; How to Set Up Your Grape</p>
+		<p>The Tangerine SDR &ndash; a high precision SDR that can collect spectrum around up to 8 center frequencies plus multiple channels of FT8 and WSPR. &ndash; How to Set Up Your Tangerine</p>
+		<p>All the SDRs mentioned above were designed for the project and use clocks accurate enough to be able to closely observe the Doppler shift in the frequency of WWV (or other precision radio sources such as CHU) when the ionosphere moves due to sunrise, sunset, and perturbations such as solar coronal mass ejections, major storms, and other energy inputs.</p>
+		<p>Software for the system is open source, and all data collected is freely available to the general public.</p>
+		<p>Here is an overview of the system architecture:</p>
+                <div class="box">
+		  <img src="{% static  'PSWS/media/image001.png' %}" alt="home">
+                </div>
+		<p>The idea is for us to have a number of SDRs (the more, the better) running in various locations in North America (in this phase, and later globally), giving us enough data to be able to track the waves that propagate through the ionosphere. These waves are made of periodic variations in the density of electrons in the ionosphere (called Transient Ionospheric Disturbances, or TIDs). Scientists in the project hope to improve their understanding of these and other ionosphere phenomena by studying the data that will be collected. If you put together a system and set it up to submit spectrum observations, you will be participating in this research, which is sponsored by the National Science Foundation! If you have a Tangerine, you can also configure it to listen to a variety of ham bands, and the system will be able to tell you what bands are open &ndash; and even notify you if your station has copied an interesting DX station, prefix, or grid.</p>
+		<p>The Central Control System (what you are looking at now), is actually pretty simple: it is a web site that lets users sign up, get a token (which works like a password) to put into their Grape or TangerineSDR, connect their SDR, and submit spectrum data, which gets cross-referenced into the CCS database. You can also download observations (spectrum data) and analyze it using the free software on this web site[under construction], and see what your station (or any other station) has collected, shown as a waterfall.</p>
+		<p>Detailed information on the design of the <a title="TAPR website" href="https://tapr.org/">TAPR</a> TangerineSDR is available <a title="Tangerine SDR web site" href="https://tangerinesdr.com/">here</a>.</p>
+		<p>Information about the Case Western Reserve University Grape SDR is available <a title="About the Grape SDR" href="https://hamsci.org/grape1">here</a>.</p>
+		<p>Learn even more about our project <a title="HAMSCI Project Site" href="https://hamsci.org/basic-project/personal-space-weather-station">here</a>.</p>
+
+{% endblock %}

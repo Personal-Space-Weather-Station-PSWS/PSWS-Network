@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block main %}
+
+<div>
+  {% if user.is_authenticated %}
+  <ul>
+    <li><a href="/home">Home</a></li>
+    <li><a href="/stations/stations">Stations</a></li>
+    <li><a href="/observations/observation_list">Observations</a></li>
+    <li><a href="/analysis/analysis">Analysis</a></li>
+    <li><a href="/user_list">Users</a></li>
+    <li>
+      <form method="post" action="{% url 'logout' %}" style="display: inline;">
+        {% csrf_token %}
+        <button type="submit" style="background: none; border: none; color: white; text-align: center; padding: 14px 16px; text-decoration: none; display: block; cursor: pointer; font-family: inherit; font-size: inherit;">Log Out</button>
+      </form>
+    </li>
+    <li class="active"><a href="/signup/">Register your station</a></li>
+    <li><a href="{% url 'profile' %}">{{ request.user.username }}</a></li>
+    <li style="float:right"><a href="/about/">About</a></li>
+  </ul>
+  {% else %}
+  <ul>
+    <li><a href="/home">Home</a></li>
+    <li><a href="/stations/stations">Stations</a></li>
+    <li><a href="/observations/observation_list">Observations</a></li>
+    <li><a href="/analysis/analysis">Analysis</a></li>
+    <li><a href="/user_list">Users</a></li>
+    <li><a href="/login/">Log In</a></li>
+    <li class="active"><a href="/signup/">Register your station</a></li>
+    <li style="float:right"><a href="/about/">About</a></li>
+  </ul>
+  {% endif %}
+</div>
+
+
+<h2>Sign up Form</h2>
+IMPORTANT:
+This is a public project funded by the National Science Foundation.
+By signing up on this website as a Personal Space Weather Network user, you attest:
+You are at least 18 years of age.
+You give consent for the project to use any data you enter or upload in any way.
+You recognise that you have no expectation of privacy and should not enter anything you deem personal or private. 
+(Amateur radio operators should enter the same information as what they have on file with the FCC.)
+The project will make a reasonable effort to maintain the integtity of the web site, but this cannot be guaranteed.
+If the web site or database is breached, no assurances are given that you will be notified.
+<form method="post">
+  {% csrf_token %}
+  {% for field in form %}
+    <p>
+      {{ field.label_tag }}<br>
+      {{ field }}
+      {% if field.help_text %}
+        <small style="color: white">{{ field.help_text }}</small>
+      {% endif %}
+      {% for error in field.errors %}
+        <p style="color: red">{{ error }}</p>
+      {% endfor %}
+    </p>
+  {% endfor %}
+  <button type="submit">Sign up</button>
+  <br>
+  <br>
+  Use the following button only if you are requesting a re-send of the activation email:
+  <button type='submit' name="resend-button" value="Resend email" >Resend activation email</button>
+  <br>
+
+</form>
+
+{% endblock %}
+

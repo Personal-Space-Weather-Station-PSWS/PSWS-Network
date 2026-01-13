@@ -1,0 +1,65 @@
+{% extends "base_stations.html" %}
+
+{% block title %}<h1 class="text-center">Stations</h1>{% endblock title %}
+
+{% block main %}
+{% load render_table from django_tables2 %}
+
+<style>
+table {
+	width: 1000px;
+	border: 5px solid black;
+}
+</style>
+<!--
+th {
+	border: 5px solid black;
+	text-align: center;
+}
+tr, td {
+	border: 3px solid #dddddd;
+	text-align: center;
+}
+-->
+<!--<h1 class="text-center">Stations</h1>-->
+<div style="padding-top: 10px;">
+    <!-- View User's Stations -->
+	<form action="{% url 'my_stations_list' %}" method="GET">
+		{% csrf_token %}
+		<button type="submit">View My Stations</button>
+	</form>
+</div>
+<div style="padding-top: 10px;">
+    <!-- Add new Station -->
+	<form action="{% url 'add_station' %}" method="GET">
+		{% csrf_token %}
+		<button type="submit">Add New Station</button>
+	</form>
+</div>
+
+<br>
+
+<div>
+	{% render_table table %}
+</div>
+
+<div class="pagination">
+    <span class="step-links">
+        {% if page_obj.has_previous %}
+            <a href="?page=1">&laquo; first</a>
+            <a href="?page={{ page_obj.previous_page_number }}">previous</a>
+        {% endif %}
+
+        <span class="current">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+        </span>
+
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}">next</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a>
+        {% endif %}
+    </span>
+</div>
+
+{% endblock main %}
+

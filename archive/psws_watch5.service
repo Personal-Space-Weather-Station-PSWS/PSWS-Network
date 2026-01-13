@@ -1,0 +1,13 @@
+[Unit]
+Decription=Watchdog script
+
+[Service]
+Type=simple
+User=[redacted]
+Group=[redacted]
+ExecStart=/usr/bin/python3 [redacted]
+Restart=always
+WorkingDirectory=[redacted]
+
+[Install]
+WantedBy=multi-user.target

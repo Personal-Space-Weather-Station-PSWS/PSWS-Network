@@ -1,0 +1,45 @@
+{% extends "base_stations.html" %}
+
+{% block title %}
+<h2 class="text-center">Station Update Form</h2>
+{% endblock title %}
+
+{% load crispy_forms_tags %}
+{% block main %}
+<br>
+<h4>Edit Station:</h4>
+<div class="main">
+	<table>
+		<tr>
+			<td>
+				<form method='POST' enctype="multipart/form-data">
+					{% csrf_token %}
+					{{ form|crispy }}
+					<button type='submit' class="btn btn-primary">Save Changes</button>
+					<br>
+
+					{% if messages %}
+					  {% for message in messages %}
+					  <p {% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</p>
+					  {% endfor %}
+					{% endif %}
+					<br>
+					Permanently delete this Station. &nbsp; (You must delete any instrument(s) on this station before you can do this.)
+					<br>
+					<button type='submit' name="del-button" value="Delete Instrument" class="btn btn-danger"> Delete Station (this cannot be undone)</button>
+					<br>
+
+				</form>
+			</td>
+		</tr>
+	</table>
+</div>
+<br>
+<form action="{% url 'station_details' id=station.id %}" method="GET">
+	{% csrf_token %}
+	<button>Back</button>
+</form>
+<br>
+
+{% endblock %}
+

@@ -1,0 +1,18 @@
+{% extends "base_instruments.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+<h2 class="text-center">Add Instrument Form</h2>
+{% endblock title %}
+
+{% block main %}
+<br>
+<h4>Add Instrument:</h4>
+
+<form method="post">
+	{% csrf_token %}
+	{{ form|crispy }}
+	<button type="submit" class="btn btn-primary btn-block">Add Instrument</button>
+</form>
+<br>
+{% endblock main %}

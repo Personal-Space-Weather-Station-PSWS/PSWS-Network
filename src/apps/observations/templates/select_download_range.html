@@ -1,0 +1,77 @@
+{% extends "base_observations.html" %}
+
+{% block title %}<h1 class="text-center">{{observation}}</h1>{% endblock title %}
+
+{% block main %}
+
+{% for message in messages %}
+    <div class="alert alert-success">
+        <a class="close" href="#" data-dismiss="alert">x</a>
+	    {{ message }}
+    </div>
+{% endfor %}
+
+<div class="parent">
+    <div class="child">
+        <ul>
+	    <li class="details">ID: {{observation.id}}</li>
+	    <li class="details">Data Type: {{datatype.dataType}}</li>
+	    <li class="details">Data Rate: {{observation.dataRate}}</li>
+	    <li class="details">Center Frequency: {{centerfreq.centerFrequency}}</li>
+	    <li class="details">Station: {{observation.station}}</li>
+	    <li class="details">Instrument: {{observation.instrument}}</li>
+	    <li class="details">Instrument type: {{observation.instrument.instrumenttype.instrumentType}}</li>
+	    <li class="details">Band: {{observation.band}}</li>
+	    <li class="details">Size: {{observation.size}}</li>
+	    <li class="details">File Name: {{observation.fileName}}</li>
+	    <li class="details">Path: {{observation.path}}</li>
+	    <li class="details">Start Date: {{observation.startDate|date:'M. d, Y, H:i:s'}}</li>
+	    <li class="details">End Date: {{observation.endDate|date:'M. d, Y, H:i:s'}}</li>
+	</ul>
+    </div>
+    {% if observation.instrument.instrumenttype.instrumentType == "Magnetometer" %}
+    <div class="child">
+		<!--<a href="{% url 'download_file' id=observation.id%}">Download Observation Data</a>-->
+		<p>Press the button below to download the observation</p>
+		<form action="{% url 'download_file' id=observation.id%}" method="POST">
+	    	{% csrf_token %}
+	    	<button type="submit">Download Observation Data</button>
+		</form>
+		<br>
+    </div>
+    {% else %}
+    <div class="child">
+	<p>Press the button below to download the observation</p>
+	<form action="/observations/download_range/{{ observation.id }}/" method="POST">
+	    {% csrf_token %}
+	    <button type="submit">Download Observation Data</button>
+	</form>
+	<br>
+	{% endif %}
+
+	<!-- Download Plot button only shows if the observation has a plot attached to it -->
+	{% if observation.plotPath != None %}
+	<!-- Download Plots -->
+    <p>Press the button below to download the plot</p>
+	<form action="{% url 'download_plot' id=observation.id %}" method="POST">
+		{% csrf_token %}
+		<button type="submit">Download Plot</button>
+	</form>    
+    </div>
+    {% endif %}
+</div>
+
+<div>
+    <!--<a href="{% url 'observation_list' %}">Back</a>-->
+	<form action="javascript: history.back()" method="GET">
+		{% csrf_token %}
+		<button type="submit">Back</button>
+	</form>
+</div>
+
+<div style="margin-top: 5%; margin-bottom: 5%;">
+	<img src= '/media/plots/{{observation.plotFile}}' alt="Graph for Observation Unavailable" width="85%" class="border" style="display: block; margin-left: auto; margin-right: auto;">
+</div>
+
+{% endblock main %}
+

@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block main %}
+
+<h1  class="text-center">Home</h1>
+
+{% if user.is_authenticated %}
+
+
+	<table>
+		<tr>
+			<td>Welcome {{ request.user.profile.role }} :</td>
+			<td><a href="{% url 'profile' %}">{{ request.user.username }}</a></td>
+                </tr>
+		<tr>
+			<td>
+				<form method="post" action="{% url 'logout' %}" style="display: inline;">
+					{% csrf_token %}
+					<button type="submit" style="background: none; border: none; color: inherit; cursor: pointer; text-decoration: underline;">logout</button>
+				</form>
+			</td>
+		</tr>
+        </table>
+	{% else %}
+	<p>Welcome to Personal Space Weather Station!</p>
+	<a href="{% url 'login' %}">Please login</a>
+	<p>Or, if you don't have an account:</p>
+	<a href="{% url 'signup' %}">Sign up for an account</a>
+{% endif %}
+
+<div id='map' style='position:absolute; top: 300px; left: 300px; width: 1200px; height: 600px;'></div>
+<script>
+  mapboxgl.accessToken = 'pk.eyJ1IjoiYWI0ZWotMSIsImEiOiJjazB1MTRmMTAwamVlM2Jwb2pheWx2cWpmIn0.cGZbctIFT5jSgBi0jBPk3w';
+  var map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/streets-v11',
+    center: [-87.0, 33.0],
+    zoom: 3.25
+  });
+</script>
+ 
+
+{% endblock %}

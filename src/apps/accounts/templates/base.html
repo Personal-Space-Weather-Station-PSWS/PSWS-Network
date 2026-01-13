@@ -1,0 +1,74 @@
+{% load static %}
+<!doctype  html>
+<html  lang="en">
+<head>
+<link  rel="stylesheet"  href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"  integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"  crossorigin="anonymous">
+<title>Personal Space Weather Station Server</title>
+
+<script src='https://api.mapbox.com/mapbox-gl-js/v2.1.1/mapbox-gl.js'></script>
+<link href='https://api.mapbox.com/mapbox-gl-js/v2.1.1/mapbox-gl.css' rel='stylesheet' />
+<style>
+ul {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+ul.Menu{
+  background-color: #333;
+}
+
+ul.a {list-style-type: circle;}
+
+li {
+  float: left;
+  border-right:1px solid #bbb;
+}
+
+li:last-child {
+  border-right: none;
+}
+
+li a {
+  display: block;
+  color: white;
+  text-align: center;
+  padding: 14px 16px;
+  text-decoration: none;
+}
+
+li a:hover:not(.active) {
+  background-color: #111;
+  text-decoration: none;
+  color: white;
+}
+
+.active {
+  background-color: #04AA6D;
+}
+
+.box {
+  width: 100%;
+}
+
+img {
+  width: 100%;
+}
+
+</style> 
+</head>
+<body>
+  <div  class="container">
+    <div  class="row justify-content-center">
+     <div class="col-10">
+      <h1  class="text-center">Personal Space Weather Station</h1>
+       <h2 class="text-center">Central Control System</h2>
+      {% block main %}
+      {% endblock %}
+     </div>
+    </div>
+  </div>
+</body>
+</html>
+

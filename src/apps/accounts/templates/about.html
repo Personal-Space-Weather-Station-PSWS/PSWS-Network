@@ -1,0 +1,240 @@
+{% extends 'base.html' %}
+{% block main %}
+
+{% if user.is_authenticated %}
+<ul class="Menu">
+	<li><a href="/home">Home</a></li>
+	<li><a href="/stations/stations">Stations</a></li>
+	<li><a href="/observations/observation_list">Observations</a></li>
+	<li><a href="/analysis/analysis">Analysis</a></li>
+	<li><a href="/user_list">Users</a></li>
+	<li>
+		<form method="post" action="{% url 'logout' %}" style="display: inline;">
+			{% csrf_token %}
+			<button type="submit" style="background: none; border: none; color: white; text-align: center; padding: 14px 16px; text-decoration: none; display: block; cursor: pointer; font-family: inherit; font-size: inherit;">Log Out</button>
+		</form>
+	</li>
+	<li><a href="/signup/">Register your station</a></li>
+	<li><a href="{% url 'profile' %}">{{ request.user.username }}</a></li>
+	<li class="active" style="float:right"><a href="/about/">About</a></li>
+  </ul>
+{% else %}
+<ul class="Menu">
+  <li><a href="/home">Home</a></li>
+  <li><a href="/stations/stations">Stations</a></li>
+  <li><a href="/observations/observation_list">Observations</a></li>
+  <li><a href="/analysis/analysis">Analysis</a></li>
+  <li><a href="/user_list">Users</a></li>
+  <li><a href="/login/">Log In</a></li>
+  <li><a href="/signup/">Register your station</a></li>
+  <li class="active" style="float:right"><a href="/about/">About</a></li>
+</ul>
+{% endif %}
+
+<style>
+  .legend-desc {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+  }
+    
+  .legend-key {
+    display: inline-block;
+    border-radius: 50%;
+    width: 12px;
+    height: 12px;
+    margin-right: 5px;
+  }
+  .api-section {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    border-left: 4px solid #007bff;
+  }
+  
+  .api-section h5 {
+    color: #007bff;
+    margin-top: 20px;
+    margin-bottom: 10px;
+  }
+  
+  .api-section h6 {
+    color: #6c757d;
+    margin-top: 15px;
+    margin-bottom: 8px;
+  }
+  
+  .api-section pre {
+    background-color: #2d3748;
+    color: #e2e8f0;
+    padding: 12px;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  
+  .api-section code {
+    background-color: #e9ecef;
+    color: #495057;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 90%;
+  }
+  
+  .api-section pre code {
+    background-color: transparent;
+    color: inherit;
+    padding: 0;
+  }
+  
+  .api-section ul {
+    margin-bottom: 15px;
+    padding-left: 20px;
+    list-style-type: disc;
+  }
+  
+  .api-section li {
+    margin-bottom: 8px;
+    display: list-item;
+    line-height: 1.6;
+  }
+  
+  .api-section ul ul {
+    margin-top: 5px;
+    margin-bottom: 5px;
+    padding-left: 20px;
+    list-style-type: circle;
+  }
+  
+  /* Ensure proper list formatting and prevent weird dividers */
+  .api-section ul li:before {
+    content: none !important;
+  }
+  
+  .api-section ul li {
+    border: none !important;
+    padding-left: 0 !important;
+    text-indent: 0 !important;
+  }
+  
+  /* Prevent inline display issues */
+  .api-section ul li {
+    display: list-item !important;
+    float: none !important;
+    width: auto !important;
+  }
+</style>
+
+
+<div class="card">
+	<div class="card-body">
+		<h4 class="card-title">About PSWS</h4>
+		<p>Welcome to the Personal Space Weather Station Central Control Server! </p>
+		<p>Here you can get registered as a user, or collect data as a researcher.</p>
+                <p>Learn about the <a href="/about1">Personal Space Weather Network</a>
+		<p>To get started, create an account by clicking <a href="/signup/">here</a></p>
+		<p>Once registered as a user, you will be able to view any uploaded data under the observations tab. In there you are able to filter based on many different parameters and download files</p>
+		<p>To get started with your own station, click on the stations tab and then hit "Add new station". Here is where you can put in your geographical information and details about the model you have obtained. At the end of this process, you will be given a randomly generated token. This token needs to be input into your Tangerine or Grape device. The token acts as your station's unique password. Once input, the device will be able to send and receive heartbeat signals to our server, and it will be automatically marked as online. Then your device will be ready to begin uploading data, either automatically or upon request depending on the selected mode</p>
+		<p>You can add a new station at any time and have multiple stations under one user account. Each with their own unique geographical information and token</p>
+		<p>Lastly, if you are a research scientist who would like to be able to create requests for data collection after an event, contact <a href="mailto: bill.engelke@cs.ua.edu">Bill Engelke</a> to be made into a Science User. Once you have that permission you will be able to create data requests  that cause the ring buffer devices to upload</p>
+		
+		<h4 id="legend-info" class="card-title">Legend</h4>
+		<div class="legend-desc"><span style="background-color: #008000;" class="legend-key"></span> <span>Online: Last upload within 24 hours</span></div>
+          	<div class="legend-desc"><span style="background-color: #FFA500;" class="legend-key"></span> <span>Possibly Online: Last upload between 1 and 5 days ago</span></div>
+          	<div class="legend-desc"><span style="background-color: #FF0000;" class="legend-key"></span> <span>Offline: Last upload >5 days ago</span></div>
+          	<div class="legend-desc"><span style="background-color: #808080;" class="legend-key"></span> <span>Retired: Last upload >3 weeks ago</span></div>
+		<br>
+		<div class="api-section">
+			<h4 id="api-info" class="card-title">Download API Documentation</h4>
+			<p>The PSWS network provides a comprehensive REST API for downloading observation data with flexible filtering options.</p>
+			
+			<h5>Authentication</h5>
+			<p>The API is publicly accessible and does not require authentication. Rate limiting is in place to prevent abuse (100 requests/day limit).</p>
+			
+			<h5>API Endpoint</h5>
+			<p><strong>Base URL:</strong> <code>https://pswsnetwork.eng.ua.edu/observations/downloadapi/</code></p>
+			<p><strong>Method:</strong> GET</p>
+			
+			<h5>Required Parameters</h5>
+			<ul>
+				<li><strong>start_date</strong> - Start date in YYYY-MM-DD format (e.g., "2024-01-01")</li>
+				<li><strong>end_date</strong> - End date in YYYY-MM-DD format (e.g., "2024-12-31")</li>
+			</ul>
+			
+			<h5>Location Filtering (Choose One)</h5>
+			<ul>
+				<li><strong>station_id</strong> - Specific station identifier (e.g., "S000028")</li>
+				<li><strong>Geographic Bounding Box:</strong>
+					<ul>
+						<li><strong>lat_min</strong> - Minimum latitude (-90 to 90)</li>
+						<li><strong>lat_max</strong> - Maximum latitude (-90 to 90)</li>
+						<li><strong>lon_min</strong> - Minimum longitude (-180 to 180)</li>
+						<li><strong>lon_max</strong> - Maximum longitude (-180 to 180)</li>
+					</ul>
+				</li>
+			</ul>
+			
+			<h5>Optional Filters</h5>
+			<ul>
+				<li><strong>instrument_id</strong> - Filter by specific instrument (integer)</li>
+				<li><strong>frequency</strong> - Filter by center frequency in MHz (decimal, 0-300000)</li>
+			</ul>
+			
+			<h5>Usage Examples</h5>
+			
+			<h6>1. Download by Station ID</h6>
+			<pre><code>curl -o output.zip \
+"https://pswsnetwork.eng.ua.edu/observations/downloadapi/?station_id=S000028&start_date=2022-12-09&end_date=2022-12-10"</code></pre>
+			
+			<h6>2. Download by Geographic Region (Alabama)</h6>
+			<pre><code>curl -o output.zip \
+"https://pswsnetwork.eng.ua.edu/observations/downloadapi/?lat_min=32.0&lat_max=35.0&lon_min=-88.0&lon_max=-84.0&start_date=2024-01-01&end_date=2024-01-31"</code></pre>
+			
+			<h6>3. Download with Frequency Filter (20m Amateur Band)</h6>
+			<pre><code>curl -o output.zip \
+"https://pswsnetwork.eng.ua.edu/observations/downloadapi/?station_id=S000028&frequency=10&start_date=2022-12-09&end_date=2022-12-10"</code></pre>
+			
+			<h6>4. Download with Instrument Filter</h6>
+			<pre><code>curl -o output.zip \
+"https://pswsnetwork.eng.ua.edu/observations/downloadapi/?station_id=S000028&instrument_id=1&start_date=2022-12-09&end_date=2022-12-10"</code></pre>
+			
+			<h6>5. Using wget</h6>
+			<pre><code>wget -O output.zip \
+"https://pswsnetwork.eng.ua.edu/observations/downloadapi/?station_id=S000028&start_date=2022-12-09&end_date=2022-12-10"</code></pre>
+			
+			<h5>Common Frequency Examples</h5>
+			<ul>
+				<li><strong>10 MHz</strong></li>
+				<li><strong>14.670 MHz</strong></li>
+				<li><strong>5 MHz</strong></li>
+				<li><strong>2.5 MHz</strong></li>
+			</ul>
+			
+			<h5>Geographic Examples</h5>
+			<ul>
+				<li><strong>Alabama Region:</strong> lat_min=32.0, lat_max=35.0, lon_min=-88.0, lon_max=-84.0</li>
+				<li><strong>Continental US:</strong> lat_min=25.0, lat_max=49.0, lon_min=-125.0, lon_max=-66.0</li>
+				<li><strong>NYC Area:</strong> lat_min=40.0, lat_max=41.0, lon_min=-74.0, lon_max=-73.0</li>
+			</ul>
+			
+			<h5>Response Format</h5>
+			<ul>
+				<li><strong>Single File:</strong> Returns the observation file directly as a ZIP download</li>
+				<li><strong>Multiple Files:</strong> Returns a ZIP archive containing all matching observations</li>
+				<li><strong>No Matches:</strong> HTTP 404 with error message</li>
+				<li><strong>Invalid Parameters:</strong> HTTP 400 with error details</li>
+			</ul>
+			
+			<h5>Error Codes</h5>
+			<ul>
+				<li><strong>429 Too Many Requests:</strong> Rate limit exceeded</li>
+				<li><strong>400 Bad Request:</strong> Invalid parameters or format</li>
+				<li><strong>401 Unauthorized:</strong> Authentication required</li>
+				<li><strong>404 Not Found:</strong> No matching observations found</li>
+				<li><strong>500 Internal Server Error:</strong> Server error during file processing</li>
+			</ul>
+		</div>
+
+{% endblock %}

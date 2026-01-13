@@ -1,0 +1,34 @@
+
+{% extends "base_stations.html" %}
+
+{% block title %}
+<h2 class="text-center">Instrument Update Form</h2>
+{% endblock title %}
+
+{% load crispy_forms_tags %}
+{% block main %}
+
+<br>
+<h4>Edit Instrument:</h4>
+
+<div class="main">
+        <form method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                {{ form|crispy }}
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <br>
+                {% if messages %}
+                        {% for message in messages %}
+                        <p {% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</p>
+                        {% endfor %}
+                {% endif %}
+                <br>
+                <p>Permanently delete this instrument.</p>
+                <button type="submit" name="del-button" value="Delete Instrument" class="btn btn-danger">Delete Instrument (this cannot be undone)</button>
+                <br>
+        </form>
+</div>
+<br>
+
+{% endblock %}
+

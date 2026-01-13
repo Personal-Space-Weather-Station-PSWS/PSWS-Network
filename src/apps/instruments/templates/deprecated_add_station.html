@@ -1,0 +1,31 @@
+{% extends "base_stations.html" %}
+
+{% block title %}
+<h2 class="text-center">Add Station Form</h2>
+{% endblock title %}
+
+{% block main %}
+IMPORTANT: All information on this page except for station nickname and Maidenhead grid square is optional.
+For grid square, we need a minimum of a 4-character grid (e.g., EM64). If you wish to omit entry of data in
+any field, just enter NA. Anything else you enter becomes public information. (Amateur radio operators: we suggest
+you use what is on file with the FCC, as it is already in the public record). We collect this information
+so that we can give you credit if your data is used in publications such as peer-reviewed journals.
+<h4>Elevation is in meters above sea level.</h4>
+<form method="post">
+        {% csrf_token %}
+        {% for field in form %}
+          <p>
+            {{ field.label_tag }}<br>
+            {{ field }}
+            {% if field.help_text %}
+              <small style="color: grey">{{ field.help_text }}</small>
+            {% endif %}
+            {% for error in field.errors %}
+              <p style="color: red">{{ error }}</p>
+            {% endfor %}
+          </p>
+        {% endfor %}
+        <button type="submit">Add Station</button>
+</form>
+{% endblock main %}
+

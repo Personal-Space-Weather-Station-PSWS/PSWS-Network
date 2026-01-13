@@ -1,0 +1,61 @@
+{% extends "base_instruments.html" %}
+
+{% block title %}<h1 class="text-center">Instruments</h1>{% endblock title %}
+
+{% block main %}
+{% load render_table from django_tables2 %}
+
+<style>
+table {
+        width: 1000px;
+        border: 5px solid black;
+}
+</style>
+<!--
+th {
+        border: 5px solid black;
+        text-align: center;
+}
+tr, td {
+        border: 3px solid #dddddd;
+        text-align: center;
+}
+-->
+<!--<h1 class="text-center">Instruments</h1>-->
+<div>
+
+<div>
+
+</div>
+<br>
+
+<div>
+        {% render_table table %}
+</div>
+
+<!--
+<table>
+        <tr>
+                <th>ID</th>
+                <th>Instrument</th>
+        </tr>
+        {% for instrument in all_instruments %}
+        <tr>
+                <td>{{instrument.id}}</td>
+                <td>{{instrument.instrument}}</td>
+                <td>{{instrument.station_id}}</td>
+                <td>{{instrument.instrumenttype_id}}</td>
+        </tr>
+        {% endfor %}
+</table>
+-->
+
+<div>
+
+</div>
+<div>
+
+</div>
+
+{% endblock main %}
+

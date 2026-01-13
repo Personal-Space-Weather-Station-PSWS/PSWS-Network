@@ -1,0 +1,105 @@
+{% load static %}
+<!doctype  html>
+<html  lang="en">
+<head>
+<link  rel="stylesheet"  href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"  integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"  crossorigin="anonymous">
+<title>Personal Space Weather Station Server</title>
+
+<script src='https://api.mapbox.com/mapbox-gl-js/v2.1.1/mapbox-gl.js'></script>
+<link href='https://api.mapbox.com/mapbox-gl-js/v2.1.1/mapbox-gl.css' rel='stylesheet' />
+<style>
+.header {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: #333;
+}
+
+ul {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: #333;
+}
+
+ul.a {list-style-type: circle;}
+
+li {
+  float: left;
+  border-right:1px solid #bbb;
+}
+
+li:last-child {
+  border-right: none;
+}
+
+li a {
+  display: block;
+  color: white;
+  text-align: center;
+  padding: 14px 16px;
+  text-decoration: none;
+}
+
+li a:hover:not(.active) {
+  background-color: #111;
+  text-decoration: none;
+  color: white;
+}
+
+.pagination li:not(.active) {
+  background-color: #333
+}
+
+.pagination li:hover:not(.pagination ) {
+  background-color: #111
+}
+
+.active {
+  background-color: #04AA6D;
+}
+</style>
+
+<body>
+  <div  class="container">
+    <div  class="row justify-content-center">
+     <div class="col-10">
+      <h1  class="text-center">Personal Space Weather Station</h1>
+       <h2 class="text-center">Central Control System</h2>
+      {% block title %}
+      {% endblock title %}
+      <div>
+        {% if user.is_authenticated %}
+        <ul>
+          <li><a href="/home">Home</a></li>
+          <li><a href="/stations/stations">Stations</a></li>
+          <li><a href="/observations/observation_list">Observations</a></li>
+          <li><a href="/analysis/analysis">Analysis</a></li>
+          <li class="active"><a href="/user_list">Users</a></li>
+          <li><a href="{% url 'logout' %}">Log Out</a></li>
+          <li><a href="/signup/">Register your station</a></li>
+          <li><a href="{% url 'profile' %}">{{ request.user.username }}</a></li>
+          <li style="float:right"><a href="/about/">About</a></li>
+        </ul>
+        {% else %}
+        <ul>
+          <li><a href="/home">Home</a></li>
+          <li><a href="/stations/stations">Stations</a></li>
+          <li><a href="/observations/observation_list">Observations</a></li>
+          <li><a href="/analysis/analysis">Analysis</a></li>
+          <li class="active"><a href="/user_list">Users</a></li>
+          <li><a href="/login/">Log In</a></li>
+          <li><a href="/signup/">Register your station</a></li>
+          <li style="float:right"><a href="/about/">About</a></li>
+        </ul>
+        {% endif %}
+      </div>
+      {% block main %}
+      {% endblock main %}
+     </div>
+    </div>
+  </div>
+</body>
+</html>

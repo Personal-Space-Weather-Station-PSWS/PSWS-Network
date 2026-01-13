@@ -1,0 +1,33 @@
+{% extends  'base.html' %}
+
+{% load crispy_forms_tags %}
+
+{% block main %}
+<div>
+  <ul class="Menu">
+    <li><a href="/">Home</a></li>
+    <li><a href="/stations/stations">Stations</a></li>
+    <li><a href="/observations/observation_list">Observations</a></li>
+    <li><a href="/user_list">Users</a></li>
+    <li><a class="active" href="/login/">Log In</a></li>
+    <li><a href="/signup/">Register your station</a></li>
+    <li style="float:right"><a href="/about/">About</a></li>
+  </ul>
+</div>
+
+<div class="card">
+<div class="card-body">
+<h4 class="card-title">Log in to your account</h4>
+
+<form method="post">
+{% csrf_token %}
+<input type="hidden" name="next" value="{{ next }}">
+
+{{ form|crispy }}
+
+<button type="submit" class="btn btn-primary btn-block">Log in</button>
+<a href="{% url 'password_reset' %}" class="btn btn-block">Reset password</a>
+</form>
+</div>
+</div>
+{% endblock %}

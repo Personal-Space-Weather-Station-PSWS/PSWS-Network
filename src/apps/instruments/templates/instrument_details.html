@@ -1,0 +1,37 @@
+{% extends "base_instruments.html" %}
+
+{% block title %}
+<h1 class="text-center">Instrument: {{instrument.nickname}}</h1>
+{% endblock title %}
+
+{% block main %}
+
+<br>
+<b>Details of this Instrument:</b>
+<ul class="info">
+        <li class="details">ID: {{instrument.id}}</li>
+        <li class="details">Instrument: {{instrument.instrument}}</li>
+        <li class="details">Date Added: {{instrument.dateAdded}}</li>
+        <li class="details">Date Removed ('None' if still in service): {{instrument.dateRemoved}}</li>
+        <li class="details">Type ID: {{instrument.instrumenttype_id}}</li>
+        <li class="details">Nickname: {{instrument.nickname}}</li>
+        <li class="details">Serial No.: {{instrument.serialNo}}</li>
+        <li class="details">Status: {{instrument.status}}</li>
+        <li class="details">Type: {{instrumentType}}</li>
+</ul>
+<br>
+
+<form action="{% url 'instrument_update' id=instrument.id %}" method="GET">
+        {% csrf_token %}
+        <button type="submit">Edit (or delete) this instrument</button>
+</form>
+<form style="padding-top: 10px;" action="{% url 'download_config' id=instrument.id %}" method="POST">
+        {% csrf_token %}
+        <button type="submit">Download Config File</button>
+</form> 
+<form style="padding-top: 10px;" action="{% url 'station_details'   id=instrument.station_id %}" method="GET">
+        {% csrf_token %}
+        <button type="submit">Back</button>
+</form>
+
+{% endblock main %}

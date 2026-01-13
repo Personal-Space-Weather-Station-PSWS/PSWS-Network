@@ -1,0 +1,209 @@
+{% extends 'base_analysis.html' %}
+{% block main %}
+
+<tr>
+	
+<div id="line_plot">
+		{% if datasets == None  %}
+		<div style="position:flex;top: 20px; background-color: rgb(208, 227, 233); padding-top: 10px; padding-bottom: 10px;"><p>{{message}}</p>
+		
+		</div>
+		{% else %}
+			
+			<h4 id='alldata'></h4>
+			{{ datasets |json_script:"datasets"}}
+			<div style="align-content: center;"><h2>HamSCI Magnetometer</h2>
+				<p> Selected dates: {{start}} to {{end}}</p>
+				<p>This data plots have been window averaged by every 60s.</p> </div>
+			{% for data in datasets %}
+				{% if data.ts|length > 1 %}
+			
+				<canvas id="lineplot{{ forloop.counter }}" width="800" height="200"></canvas>
+				<div>change y scale to: 
+					<button onClick="updateScales('{{ forloop.counter }}',1)">1</button>
+					<button onClick="updateScales('{{ forloop.counter }}',10)">10</button>
+					<button onClick="updateScales('{{ forloop.counter }}',100)">100</button>
+				</div>
+				 
+					{%else%}
+					<div><canvas hidden  id="lineplot{{ forloop.counter }}" width="800" height="10"></canvas></div>
+					{%endif%}
+			{% endfor %} 
+
+			{% for data in datasets %}
+				{% if data.ts|length < 1 %}
+				
+				<div>{{data.station_name}} does not have an observation in selected period.</div>
+				{%endif%}
+
+				
+			{% endfor %} 
+		{% endif %}
+			</div>
+</tr>
+</table>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.0/chartjs-plugin-zoom.min.js" integrity="sha512-B6F98QATBNaDHSE7uANGo5h0mU6fhKCUD+SPAY7KZDxE8QgZw9rewDtNiu3mbbutYDWOKT3SPYD8qDBpG2QnEg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<script>
+	function updateScales(chart_id,num) {
+		var id=parseInt(chart_id)-1;
+		charts[id].options.scales.y={
+			
+			title:{
+				display:true,
+				text: 'B(nT)'
+			},
+			min:-num,
+			max:num,
+				
+		}
+		charts[id].update();
+		}
+
+	//get data from response and make chart with chartjs
+if(document.getElementById('datasets')){
+	charts=[]
+	const datasets = JSON.parse(document.getElementById('datasets').textContent);
+	for (let i=0;i<datasets.length;i++){
+		var index=i+1;
+		var showx=false;
+		var n=datasets[i].ts.length;
+		let ts = new Array(n); for (let j=0; j<n; ++j) ts[j] = '     ';  //this only show empty for x except the last one
+		if(i==datasets.length-1){
+			showx=true;
+			var times = []; // dummy time array
+			var tt = 0; 	
+			//loop to increment the time and push results in array
+			var days=n/24/60;
+			for(var k=0;k<days;k++){
+				for (var j=0;tt<24*60; j++) {
+					var hh = Math.floor(tt/60); // getting hours of day in 0-24 format
+					var mm = (tt%60); // getting minutes of the hour in 0-55 format
+					var hours=['00','06','12','18','23'];
+					var m=(("0" + mm).slice(-2));
+					var h=(("0" + (hh % 24)).slice(-2));
+					
+					if( (m.includes('00')) && (hours.includes(h))){
+						times[k+j] = ("0" + (hh % 24)).slice(-2) + ':' + ("0" + mm).slice(-2); 
+						
+					}
+					else{
+						times[k+j]='';
+					}
+					tt = tt + 1;
+					if(times.length==n){break;}
+				}
+
+				if(times.length==n){break;}
+			}
+			ts=times;
+		}
+		var ctx = document.getElementById('lineplot'+index.toString()).getContext('2d');
+		var myChart = new Chart(ctx, {
+			type: 'line',
+			data:{
+				// labels : datasets[i].ts,
+				labels : ts,
+				datasets: [{
+					label: "x",
+					data :datasets[i].xs,
+					borderColor: 'red',
+					borderWidth: 0.3,
+					tension: 0.1,
+					fill: false,
+					pointRadius: 0.5,
+					},
+					{
+					label: "y",
+					data :datasets[i].ys,
+					borderColor: "black",
+					tension: 0.1,
+					borderWidth: 0.3,
+					fill: false,
+					pointRadius: 0.5,
+					},
+					{
+					label: "z",
+					data :datasets[i].zs,
+					borderWidth: 0.3,
+					tension: 0.1,
+					borderColor: "blue",
+					fill: false,
+					pointRadius: 0.5,
+					}]
+			},
+		options:{
+			responsive:true,
+			scales: {
+				x:{
+					title:{
+						display:showx,
+						text:'time'
+					},
+					ticks:{ 
+						maxRotation:0, 
+						autoSkip:false,
+						align: 'center',
+						},
+					grid: {
+						display: false,
+						drawOnChartArea: true,
+						drawTicks: true,
+						}
+				},
+				y:{
+					title:{
+						display:true,
+						text: 'B(nT)'
+					},
+					min:-100,
+					max:100,
+				}
+				},
+			plugins:{
+				legend: {
+					display: true,
+					position:'right',
+					labels:{
+						usePointStyle:true,
+						pointStyle:'line'
+					}
+					},
+			title:{
+				display:true,
+				text: datasets[i].station_name+', '+ datasets[i].station_address,
+			},
+			zoom: {
+				pan:{
+					enabled:true,
+					mode: 'xy',
+					
+				},
+				zoom: {
+					wheel: {
+						enabled: true,
+					},
+					pinch: {
+						enabled: true
+					},
+					mode: 'xy',
+					}
+			}
+		}
+	},
+		
+		
+	
+});
+	charts[i]=myChart;
+	};
+	
+}
+			
+  
+</script>
+
+
+{% endblock %}

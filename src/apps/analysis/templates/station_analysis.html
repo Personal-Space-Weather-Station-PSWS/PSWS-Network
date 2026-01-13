@@ -1,0 +1,57 @@
+{% extends "base_analysis.html" %}
+
+{% block title %}
+<h1 class="text-center">{{station.nickname}}</h1>
+{% endblock title %}
+
+{% block main %}
+{% load render_table from django_tables2 %}
+
+<style>
+table {
+        width: 1000px;
+        border: 5px solid black;
+}
+</style>
+
+<br>
+<a href="{% url 'analysis_map' %}">Back to map</a>
+<div>
+Details of this station:
+</div>
+<ul>
+	<li class="details">ID: {{station.station_id}}</li>
+        <li class="details">Nickname: {{station.nickname}}</li>
+	<li class="details">User: {{station.user.username}}</li>
+	<li class="details">Latitude: {{station.latitude|floatformat:3}}</li>
+	<li class="details">Longitude: {{station.longitude|floatformat:3}}</li>
+	<li class="details">Grid: {{station.grid}}</li>
+	<li class="details">Elevation: {{station.elevation}}</li>
+	<li class="details">Antenna 1: {{station.antenna_1}}</li>
+	<li class="details">Antenna 2: {{station.antenna_2}}</li>
+	<li class="details">Date Created: {{station.create_date}}</li>
+</ul>
+Below is a list of observations collected by this station.
+<div>
+	{% render_table table %}
+</div>
+
+<div class="pagination">
+    <span class="step-links">
+        {% if page_obj.has_previous %}
+            <a href="?page=1">&laquo; first</a>
+            <a href="?page={{ page_obj.previous_page_number }}">previous</a>
+        {% endif %}
+
+        <span class="current">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+        </span>
+
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}">next</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a>
+        {% endif %}
+    </span>
+</div>
+
+{% endblock main %}

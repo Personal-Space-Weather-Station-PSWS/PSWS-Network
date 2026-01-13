@@ -1,0 +1,100 @@
+{% extends "base_stations.html" %}
+
+{% block title %} 
+<h1 class="text-center">{{request.user.username}}'s Stations</h1>
+{% endblock title %}
+
+{% block main %}
+{% load render_table from django_tables2 %}
+
+<style>
+table {
+	width: 1000px;
+	border: 5px solid black;
+}
+</style>
+
+<!--
+th {
+	border: 5px solid black;
+	text-align: center;
+}
+tr, td {
+	border: 3px solid #dddddd;
+	text-align: center;
+}
+</style>
+-->
+
+<div style="padding-top: 10px;">
+    <!-- Add Station -->
+	<form action="{% url 'add_station' %}" method="GET">
+		{% csrf_token %}
+		<button type="submit">Add New Station</button>
+	</form>
+</div>
+
+<div>
+To add a new instrument, click on the station's ID.
+</div>
+<div>
+To look at the details of a station (or edit it), click on its link in the ID column
+</div>
+<br>
+
+<div>
+	{% render_table table %}
+</div>
+
+<!--
+<table>
+	<tr>
+		<th>ID</th>
+		<th>User</th>
+		<th>Nickname</th>
+		<th>Grid</th>
+		<th>Elevation</th>
+		<th>Antenna 1</th>
+		<th>Antenna 2</th>
+	</tr>
+	{% for station in request.user.station_set.all %}
+	<tr>
+		<td><a href="{% url 'station_details' id=station.id %}">{{station.station_id}}</a></td>
+		<td>{{station.user.username}}</td>
+		<td>{{station.nickname}}</td>
+		<td>{{station.grid}}</td>
+		<td>{{station.elevation}}</td>
+		<td>{{station.antenna_1}}</td>
+		<td>{{station.antenna_2}}</td>
+	</tr>
+	{% endfor %}
+</table>
+-->
+<div style="padding-top: 10px;">
+    <!-- Back to Stations page-->
+	<form action="{% url 'stations' %}" method="GET">
+		{% csrf_token %}
+		<button type="submit">Back</button>
+	</form>
+</div>
+
+<div class="pagination">
+    <span class="step-links">
+	{% if page_obj.has_previous %}
+	    <a href="?page=1">&laquo; first</a>
+	    <a href="?page={{ page_obj.previous_page_number }}">previous</a>
+	{% endif %}
+
+	<span class="current">
+	    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+	</span>
+
+	{% if page_obj.has_next %}
+	    <a href="?page={{ page_obj.next_page_number }}">next</a>
+	    <a href="?page={{ page_obj.paginator.num_pages }}">kast &raquo;</a>
+	{% endif %}
+    </span>
+</div>
+
+{% endblock main %}
+

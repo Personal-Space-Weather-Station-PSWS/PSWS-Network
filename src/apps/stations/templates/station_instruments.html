@@ -1,0 +1,54 @@
+{% extends "base_stations.html" %}
+
+{% block title %}
+  <h1 class="text-center">Station Instruments</h1>
+{% endblock title %}
+
+{% block main %}
+{% load render_table from django_tables2 %}
+
+<style>
+table {
+    width: 1000px;
+}
+#show_usr_btn {
+    width: 130px;
+}
+</style>
+
+<!-- Back button -->
+<div style="padding-top: 10px;">
+    <form action="{% url 'stations' %}" method="GET">
+	<input type="hidden" name="swap" value="1">
+        {% csrf_token %}
+        <button type="submit">⬅ Back to Station List</button>
+    </form>
+</div>
+
+<br>
+
+<!-- Render the table -->
+<div>
+    {% render_table table %}
+</div>
+
+<!-- Pagination -->
+<div class="pagination">
+    <span class="step-links">
+        {% if page_obj.has_previous %}
+            <a href="?page=1">&laquo; first</a>
+            <a href="?page={{ page_obj.previous_page_number }}">previous</a>
+        {% endif %}
+
+        <span class="current">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+        </span>
+
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}">next</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a>
+        {% endif %}
+    </span>
+</div>
+
+{% endblock main %}
