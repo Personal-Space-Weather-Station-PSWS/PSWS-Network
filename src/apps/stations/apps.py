@@ -10,4 +10,4 @@ from django.apps import AppConfig
 
 
 class StationsConfig(AppConfig):
-    name = 'stations'
+    name = 'apps.stations'
