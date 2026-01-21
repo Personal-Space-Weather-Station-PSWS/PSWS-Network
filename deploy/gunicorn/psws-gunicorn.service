@@ -1,0 +1,24 @@
+[Unit]
+Description=Gunicorn for PSWS-Network
+After=network.target
+
+[Service]
+Type=simple
+
+User=psws
+Group=psws
+
+WorkingDirectory=/srv/PSWS-Network
+Environment="DJANGO_SETTINGS_MODULE=psws.settings.prod"
+Environment="PYTHONPATH=/srv/PSWS-Network/src"
+
+ExecStart=/srv/PSWS-Network/venv312/bin/gunicorn --bind :8080 psws.wsgi:application
+
+Restart=always
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
