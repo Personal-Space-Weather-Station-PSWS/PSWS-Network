@@ -9,11 +9,11 @@
 import django_filters
 
 from .models import Observation
-from stations.models import Station
-from bands.models import Band
-from centerfrequencies.models import CenterFrequency
-from instruments.models import Instrument
-from instrumenttypes.models import InstrumentType
+from apps.stations.models import Station
+from apps.bands.models import Band
+from apps.centerfrequencies.models import CenterFrequency
+from apps.instruments.models import Instrument
+from apps.instrumenttypes.models import InstrumentType
 from django import forms
 
 class ObservationForm(forms.Form):

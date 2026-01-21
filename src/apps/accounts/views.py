@@ -30,11 +30,11 @@ from .forms import SignUpForm, EditProfileForm
 from .tokens import account_activation_token
 from .models import Profile
 from .tables import UserTable
-from stations.models import Station
+from apps.stations.models import Station
 
-from observations.models import Observation
-from observations.tables import ObservationTable
-from instruments.models import Instrument
+from apps.observations.models import Observation
+from apps.observations.tables import ObservationTable
+from apps.instruments.models import Instrument
 
 import logging
 logger = logging.getLogger(__name__)

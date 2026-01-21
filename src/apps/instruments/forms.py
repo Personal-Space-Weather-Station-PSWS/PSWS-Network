@@ -9,8 +9,8 @@
 from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
-from instruments.models import Instrument
-from instrumenttypes.models import InstrumentType
+from apps.instruments.models import Instrument
+from apps.instrumenttypes.models import InstrumentType
 
 #from crispy_forms.helper import FormHelper
 

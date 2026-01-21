@@ -14,8 +14,8 @@ from django.http import FileResponse
 from datetime import datetime
 import tempfile, os, zipfile
 
-from stations.models import Station
-from observations.models import Observation
+from apps.stations.models import Station
+from apps.observations.models import Observation
 
 class ObservationDownloadAPIView(APIView):
     throttle_classes = [AnonRateThrottle]
