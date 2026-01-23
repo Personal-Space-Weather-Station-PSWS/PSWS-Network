@@ -24,8 +24,11 @@ yarn-error.log*
 
 # Logs
 *.log
+/logs
 
 # OS/editor
 .DS_Store
 .idea/
 .vscode/
+
+requirements-dev.txt

@@ -13,8 +13,9 @@
 import os, sys, pytz
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT))
+# SCRIPTS_DIR is 1 level up from scripts/ingest/
+SCRIPTS_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(SCRIPTS_DIR))
 
 # Django bootstrap to set up environment for Database access
 from _bootstrap_django import bootstrap 
@@ -31,7 +32,7 @@ import datetime as dz
 
 def writeLog(theMessage):
     timestamp = dt.now(timezone.utc).isoformat()[0:19]
-    f = open("/var/log/watchdog/watchdog.log", "a")
+    f = open("/srv/PSWS-Network/logs/psws_watchdog.log", "a")
     f.write(timestamp + " " + theMessage + "\n")
     f.close()
 
