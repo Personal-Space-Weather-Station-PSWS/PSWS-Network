@@ -21,7 +21,7 @@ django-smoke-tests==2.1.0
 django-tables2==2.7.5
 djangorestframework==3.16.0
 dotenv==0.9.9
-fonttools==4.60.0
+fonttools==4.60.2
 gunicorn==23.0.0
 h5py==3.14.0
 idna==3.10
