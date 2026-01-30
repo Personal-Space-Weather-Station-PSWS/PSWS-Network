@@ -14,7 +14,7 @@ crispy-bootstrap4==2025.6
 cryptography==45.0.5
 cycler==0.12.1
 digital_rf==2.6.12
-Django==5.2.4
+Django==4.2.27
 django-crispy-forms==2.4
 django-filter==25.1
 django-smoke-tests==2.1.0
