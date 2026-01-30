@@ -12,9 +12,19 @@
 
 import os, sys, pytz
 from pathlib import Path
+from dotenv import load_dotenv
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT))
+# SCRIPTS_DIR is 1 level up from scripts/ingest/
+SCRIPTS_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(SCRIPTS_DIR))
+
+# Load environment variables from scripts/.env
+load_dotenv(SCRIPTS_DIR / ".env")
+
+# Configuration from environment variables (with defaults)
+LOG_PATH = os.getenv("LOG_PATH")
+PYTHON_EXECUTABLE = os.getenv("PYTHON_EXECUTABLE")
+PLOT_PATH = os.getenv("PLOT_PATH")
 
 # Django bootstrap to set up environment for Database access
 from _bootstrap_django import bootstrap 
@@ -31,7 +41,9 @@ import datetime as dz
 
 def writeLog(theMessage):
     timestamp = dt.now(timezone.utc).isoformat()[0:19]
-    f = open("/var/log/watchdog/watchdog.log", "a")
+    # Ensure log directory exists
+    os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+    f = open(LOG_PATH, "a")
     f.write(timestamp + " " + theMessage + "\n")
     f.close()
 
@@ -100,14 +112,13 @@ if len(obs_list) == 0:   # this is a new observation
     theObs.save()
 
 # Build command for plotting this fldigi observation; use Task Spooler
-  #  cmd = 'ts /home/bengelke/venv/bin/python3 plotfldigi1.py -f ' + path + " -e " + \
-  #      trigger + " -p /var/www/html/PSWS/static/PSWS/plots/" + fileName
-    cmd = 'ts /opt/venv311/bin/python3 plotfldigi1.py -f ' + path + " -e " + \
-        trigger + " -p /psws/psws/media/plots/" + os.path.splitext(fileName)[0] # remove extension
+    PLOTTERS_SCRIPT = str(SCRIPTS_DIR / "plotters/plotfldigi1.py")
+
+    cmd = 'ts ' + PYTHON_EXECUTABLE + ' ' + PLOTTERS_SCRIPT + ' -f ' + path + ' -e ' + \
+        trigger + ' -p ' + PLOT_PATH + os.path.splitext(fileName)[0] # remove extension
     print("plot cmd=", cmd)
     writeLog("Plot cmd=" + cmd)
     os.system(cmd)
-
 
      #  print("saving obs")
      #  # a=input()
