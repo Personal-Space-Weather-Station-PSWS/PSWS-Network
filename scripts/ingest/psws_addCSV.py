@@ -14,7 +14,8 @@ import os, sys, pytz
 from pathlib import Path
 from dotenv import load_dotenv
 
-# SCRIPTS_DIR is 1 level up from scripts/ingest/
+# NOTE: Despite the name, SCRIPTS_DIR points to the repository root,
+# i.e., one level up from scripts/ingest/.
 SCRIPTS_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS_DIR))
 
