@@ -6,6 +6,7 @@
 #
 # The full license is in the LICENSE file, distributed with this software.
 # ----------------------------------------------------------------------------
+from _bootstrap_django import bootstrap
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -15,22 +16,33 @@ import argparse
 import os
 from datetime import datetime
 import zipfile
+from dotenv import load_dotenv
 
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
+env_path = Path(__file__).resolve().parent.parent / 'scripts.env'
+load_dotenv(dotenv_path=env_path)
 # Django bootstrap to set up environment for Database access
-from _bootstrap_django import bootstrap 
-bootstrap() 
+bootstrap()
 
-from observations.models import Observation
-from stations.models import Station
+PLOT_PATH = os.getenv("PLOT_PATH")
+LOG_PATH = os.getenv("LOG_PATH")
+
+if not PLOT_PATH:
+    raise EnvironmentError("PLOT_PATH not set in scripts.env")
+if not LOG_PATH:
+    raise EnvironmentError("LOG_PATH not set in scripts.env")
+
+# Then use them:
+plot_output_path = os.path.join(PLOT_PATH, "mag")
+
 
 def writeLog(theMessage):
     timestamp = datetime.now().isoformat()[0:19]
-    with open("/var/log/watchdog/watchdog.log", "a") as f:
+    with open(LOG_PATH, "a") as f:
         f.write(timestamp + " " + theMessage + "\n")
 
 
@@ -42,7 +54,6 @@ def open_maybe_zip(path):
     """
     if path.endswith(".zip"):
         z = zipfile.ZipFile(path, 'r')
-        # Use first file in archive
         name = z.namelist()[0]
         f = z.open(name)
         return f, name
@@ -61,115 +72,179 @@ def load_dataframe(path):
         bx, by, bz = 'x', 'y', 'z'
     else:
         names = ['ts', 'rt', 'lt', 'x', 'y', 'z', 'rx', 'ry', 'rz', 'Tm']
-        df = pd.read_csv(f, names=names)
+        # Handle quoted CSV values with quotechar parameter
+        df = pd.read_csv(f, names=names, quotechar='"', skipinitialspace=True)
         bx, by, bz = 'x', 'y', 'z'
 
     f.close()
     return df, inner_name, bx, by, bz
 
 
-# ---------------------------------------------------
-# MAIN WORKFLOW
-# ---------------------------------------------------
-def main(path, station, date, lat, lon, grid, nick, event_src_path=None, instrument_id=None):
-    plot_output_path = "/psws/psws/media/plots/mag"
+def plot_magnetometer(path, station, date, lat, lon, grid, nick, instrument_id):
+    """
+    Plot magnetometer data from a file.
 
-    if event_src_path:
-        writeLog('plotmag called with event: ' + event_src_path)
-        stationIDstr = event_src_path.rsplit('/')[-2]
-        instrumentID = event_src_path.rsplit('_#')[1]
-        filename = event_src_path.rsplit('_#')[0].rsplit('/')[-1]
-    else:
+    Args:
+        path: Path to magnetometer data file (zip or raw)
+        station: Station ID (e.g., 'N000015')
+        date: Date string (YYYY-MM-DD)
+        lat: Latitude (float or string)
+        lon: Longitude (float or string)
+        grid: Maidenhead grid
+        nick: Station nickname
+        instrument_id: Instrument ID
+
+    Returns:
+        output_full_path: Path to generated plot file, or None on error
+    """
+    from apps.stations.models import Station
+    from apps.observations.models import Observation
+    try:
+        writeLog(f'plot_magnetometer called for station {
+                 station}, file {path}')
+
+        os.makedirs(plot_output_path, exist_ok=True)
+
         stationIDstr = station
         instrumentID = instrument_id
         filename = os.path.basename(path)
 
-    writeLog(f'Processing magnetometer data for station {stationIDstr}')
+        df, actual_filename, bx, by, bz = load_dataframe(path)
+        parse_success = False
 
-    df, actual_filename, bx, by, bz = load_dataframe(path)
+        if isinstance(df['ts'].iloc[0], str):
+            df['ts'] = df['ts'].str.strip().str.strip('"')
+            writeLog(f"After stripping quotes: {df['ts'].iloc[0]}")
 
-    df['ts'] = pd.to_datetime(df['ts'], format='%d %b %Y %H:%M:%S')
-    df = df.set_index('ts')
-    df_avg = df.resample('10min').mean().dropna()
+        try:
+            df['ts'] = pd.to_datetime(df['ts'], format='%d %b %Y %H:%M:%S')
+            parse_success = True
+            writeLog(
+                "Successfully parsed timestamps with format '%d %b %Y %H:%M:%S'")
+        except Exception as e:
+            writeLog(f"First parse attempt failed: {str(e)}")
+            try:
+                df['ts'] = pd.to_datetime(df['ts'])
+                parse_success = True
+                writeLog(
+                    "Successfully parsed timestamps with pandas auto-detection")
+            except Exception as e2:
+                writeLog(f"Second parse attempt failed: {str(e2)}")
 
-    fig, ax1 = plt.subplots(figsize=(10, 6))
+        if not parse_success:
+            writeLog("ERROR: Could not parse timestamps")
+            return None
 
-    title_line1 = f"Magnetometer Station {station}  {date}"
-    title_line2 = f"lat. {lat}  long {lon}  grid {grid}  Nickname {nick}"
+        writeLog(f"Date range: {df['ts'].min()} to {df['ts'].max()}")
 
-    fig.suptitle(title_line1 + '\n' + title_line2, fontsize=11, ha='center', y=0.98)
+        df = df.set_index('ts')
 
-    ax1.plot(df_avg.index, df_avg[bx], color='tab:red', label='Bx')
-    ax1.set_ylabel('Bx (nT)', color='tab:red')
-    ax1.tick_params(axis='y', labelcolor='tab:red')
+        writeLog(f"NaN counts before resampling - x: {df[bx].isna().sum()}, y: {
+                 df[by].isna().sum()}, z: {df[bz].isna().sum()}")
 
-    ax2 = ax1.twinx()
-    ax2.plot(df_avg.index, df_avg[by], color='tab:blue', label='By')
-    ax2.set_ylabel('By (nT)', color='tab:blue')
-    ax2.tick_params(axis='y', labelcolor='tab:blue')
+        df_avg = df.resample('10min').mean()
 
-    ax3 = ax1.twinx()
-    ax3.spines['right'].set_position(('outward', 60))
-    ax3.plot(df_avg.index, df_avg[bz], color='tab:green', label='Bz')
-    ax3.set_ylabel('Bz (nT)', color='tab:green')
-    ax3.tick_params(axis='y', labelcolor='tab:green')
+        writeLog(f"After resampling (before dropna): {len(df_avg)} rows")
+        writeLog(f"NaN counts after resampling - x: {df_avg[bx].isna().sum()}, y: {
+                 df_avg[by].isna().sum()}, z: {df_avg[bz].isna().sum()}")
 
-    ax1.set_xlabel('Time (UTC)')
-    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-    ax1.xaxis.set_major_locator(mdates.HourLocator(interval=2))
-    fig.autofmt_xdate()
+        df_avg = df_avg.dropna(subset=[bx, by, bz], how='all')
 
-    start_of_day = df_avg.index[0].normalize()
-    end_of_day = start_of_day + pd.Timedelta(days=1)
-    ax1.set_xlim((start_of_day, end_of_day))
+        writeLog(f"After resampling: {len(df_avg)} rows")
 
-    ax1.yaxis.set_major_locator(ticker.MultipleLocator(10))
-    ax2.yaxis.set_major_locator(ticker.MultipleLocator(10))
-    ax3.yaxis.set_major_locator(ticker.MultipleLocator(10))
+        if df_avg.empty:
+            writeLog(
+                "ERROR: No data after resampling. All magnetometer values are NaN.")
+            return None
 
-    ax1.grid(True, linestyle=':')
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
+        fig, ax1 = plt.subplots(figsize=(10, 6))
 
-    output_filename = f"{stationIDstr}_{instrumentID}_{date}_{grid}.png"
-    output_full_path = os.path.join(plot_output_path, output_filename)
+        title_line1 = f"Magnetometer Station {station}  {date}"
+        title_line2 = f"lat. {lat}  long {lon}  grid {grid}  Nickname {nick}"
 
-    writeLog(f'Saving plot as: {output_filename}')
-    plt.savefig(output_full_path, dpi=300)
-    plt.close('all')
+        fig.suptitle(title_line1 + '\n' + title_line2,
+                     fontsize=11, ha='center', y=0.98)
 
-    try:
-        writeLog(f'Updating database for station {stationIDstr}, instrument {instrumentID}, file {filename}')
+        ax1.plot(df_avg.index, df_avg[bx], color='tab:red', label='Bx')
+        ax1.set_ylabel('Bx (nT)', color='tab:red')
+        ax1.tick_params(axis='y', labelcolor='tab:red')
 
-        theStationQS = Station.objects.filter(station_id=stationIDstr)
-        if theStationQS.exists():
-            station_id = theStationQS.values()[0]['id']
+        ax2 = ax1.twinx()
+        ax2.plot(df_avg.index, df_avg[by], color='tab:blue', label='By')
+        ax2.set_ylabel('By (nT)', color='tab:blue')
+        ax2.tick_params(axis='y', labelcolor='tab:blue')
 
-            theObsQS = Observation.objects.filter(
-                station_id=station_id,
-                instrument_id=instrumentID,
-                fileName=actual_filename  
-            )
+        ax3 = ax1.twinx()
+        ax3.spines['right'].set_position(('outward', 60))
+        ax3.plot(df_avg.index, df_avg[bz], color='tab:green', label='Bz')
+        ax3.set_ylabel('Bz (nT)', color='tab:green')
+        ax3.tick_params(axis='y', labelcolor='tab:green')
 
-            if theObsQS.exists():
-                writeLog(f'Updating observation with plot at: {plot_output_path}/{output_filename}')
-                obs_id = theObsQS.values()[0]["id"]
-                obs_instance = Observation.objects.get(id=obs_id)
-                obs_instance.plotFile = output_filename
-                obs_instance.plotPath = plot_output_path
-                obs_instance.save()
-                writeLog('Database update successful')
-                print("Database update successful")
+        ax1.set_xlabel('Time (UTC)')
+        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        ax1.xaxis.set_major_locator(mdates.HourLocator(interval=2))
+        fig.autofmt_xdate()
+
+        start_of_day = df_avg.index[0].normalize()
+        end_of_day = start_of_day + pd.Timedelta(days=1)
+        ax1.set_xlim((start_of_day, end_of_day))
+
+        for ax in (ax1, ax2, ax3):
+            ax.yaxis.set_major_locator(ticker.LinearLocator(20))
+            ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
+            ax.ticklabel_format(axis='y', style='plain', useOffset=False)
+
+        ax1.grid(True, linestyle=':')
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+
+        output_filename = f"{stationIDstr}_{instrumentID}_{date}_{grid}.png"
+        output_full_path = os.path.join(plot_output_path, output_filename)
+
+        writeLog(f'Saving plot as: {output_filename}')
+        plt.savefig(output_full_path, dpi=300)
+        plt.close('all')
+
+        # Update database
+        try:
+            writeLog(f'Updating database for station {
+                     stationIDstr}, instrument {instrumentID}, file {filename}')
+
+            theStationQS = Station.objects.filter(station_id=stationIDstr)
+            if theStationQS.exists():
+                station_id = theStationQS.values()[0]['id']
+
+                theObsQS = Observation.objects.filter(
+                    station_id=station_id,
+                    instrument_id=instrumentID,
+                    fileName=actual_filename
+                )
+
+                if theObsQS.exists():
+                    writeLog(f'Updating observation with plot at: {
+                             plot_output_path}/{output_filename}')
+                    obs_id = theObsQS.values()[0]["id"]
+                    obs_instance = Observation.objects.get(id=obs_id)
+                    obs_instance.plotFile = output_filename
+                    obs_instance.plotPath = plot_output_path
+                    obs_instance.save()
+                    writeLog('Database update successful')
+                else:
+                    writeLog(f'WARNING: No observation found for station {
+                             station_id}, instrument {instrumentID}, file {actual_filename}')
             else:
-                writeLog(f'WARNING: No observation found for station {station_id}, instrument {instrumentID}, file {actual_filename}')
-                print(f'WARNING: No observation found in database')
-        else:
-            writeLog(f'WARNING: Station {stationIDstr} not found in database')
-            print(f'WARNING: Station not found in database')
+                writeLog(f'WARNING: Station {
+                         stationIDstr} not found in database')
+
+        except Exception as e:
+            writeLog(f'ERROR updating database: {str(e)}')
+
+        return output_full_path
 
     except Exception as e:
-        writeLog(f'ERROR updating database: {str(e)}')
-        print(f'ERROR updating database: {str(e)}')
-
+        writeLog(f'ERROR in plot_magnetometer: {str(e)}')
+        import traceback
+        writeLog(traceback.format_exc())
+        return None
 
 
 if __name__ == "__main__":
@@ -181,13 +256,20 @@ if __name__ == "__main__":
     parser.add_argument('--long', required=True, help='Longitude')
     parser.add_argument('--grid', required=True, help='Grid identifier')
     parser.add_argument('--nick', required=True, help='Nickname')
-    parser.add_argument('-e', '--event', help='Event source path from watchdog')
-    parser.add_argument('-i', '--instrument', help='Instrument ID (required if not using event)')
+    parser.add_argument('-i', '--instrument',
+                        required=True, help='Instrument ID')
 
     args = parser.parse_args()
 
-    main(
+    # Call the main plotting function
+    result = plot_magnetometer(
         args.path, args.station, args.date,
         args.lat, args.long, args.grid, args.nick,
-        args.event, args.instrument
+        args.instrument
     )
+
+    if result:
+        print(f"Plot saved to: {result}")
+    else:
+        print("Plotting failed - check logs")
+        sys.exit(1)
