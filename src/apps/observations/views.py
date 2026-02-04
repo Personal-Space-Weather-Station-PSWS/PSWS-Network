@@ -76,7 +76,6 @@ def download_file(request, id=None):
 
     try:  # does the requested tar file exist?
         fl = open(fl_path, 'rb')
-        os.remove(fl_path)
     except IOError:  # file is not there, see if this is request for download of  DRF dataset
         obs = get_object_or_404(Observation, id=id)
         fl_path =  obs.fileName
