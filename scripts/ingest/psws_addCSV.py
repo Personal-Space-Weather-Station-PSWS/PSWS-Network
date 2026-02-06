@@ -14,18 +14,24 @@ import os, sys, pytz
 from pathlib import Path
 from dotenv import load_dotenv
 
-# NOTE: Despite the name, SCRIPTS_DIR points to the repository root,
-# i.e., one level up from scripts/ingest/.
-SCRIPTS_DIR = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(SCRIPTS_DIR))
+# SCRIPTS_ROOT_DIR is 1 level up from scripts/ingest/
+SCRIPTS_ROOT_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(SCRIPTS_ROOT_DIR))
 
-# Load environment variables from scripts/.env
-load_dotenv(SCRIPTS_DIR / ".env")
+# Load environment variables from scripts/scripts.env
+load_dotenv(SCRIPTS_ROOT_DIR / "scripts.env")
 
 # Configuration from environment variables (with defaults)
 LOG_PATH = os.getenv("LOG_PATH")
 PYTHON_EXECUTABLE = os.getenv("PYTHON_EXECUTABLE")
 PLOT_PATH = os.getenv("PLOT_PATH")
+
+if not LOG_PATH:
+    raise EnvironmentError("LOG_PATH not set in scripts.env")
+if not PYTHON_EXECUTABLE:
+    raise EnvironmentError("PYTHON_EXECUTABLE not set in scripts.env")
+if not PLOT_PATH:
+    raise EnvironmentError("PLOT_PATH not set in scripts.env")
 
 # Django bootstrap to set up environment for Database access
 from _bootstrap_django import bootstrap 
@@ -113,7 +119,7 @@ if len(obs_list) == 0:   # this is a new observation
     theObs.save()
 
 # Build command for plotting this fldigi observation; use Task Spooler
-    PLOTTERS_SCRIPT = str(SCRIPTS_DIR / "plotters/plotfldigi1.py")
+    PLOTTERS_SCRIPT = str(SCRIPTS_ROOT_DIR / "plotters/plotfldigi1.py")
 
     cmd = 'ts ' + PYTHON_EXECUTABLE + ' ' + PLOTTERS_SCRIPT + ' -f ' + path + ' -e ' + \
         trigger + ' -p ' + PLOT_PATH + os.path.splitext(fileName)[0] # remove extension

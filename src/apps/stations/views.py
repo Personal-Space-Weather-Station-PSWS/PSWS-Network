@@ -11,8 +11,8 @@ from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.views.generic.edit import UpdateView
 from datetime import datetime
-from stations.models import Station
-from stations.forms import StationCreationForm
+from apps.stations.models import Station
+from apps.stations.forms import StationCreationForm
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
 from django_tables2 import SingleTableView
@@ -24,9 +24,9 @@ from .forms import EditStationForm
 from .tokens import station_activation_token
 from .forms import StationUserFilterForm
 
-from instruments.models import Instrument
-from instruments.tables import InstrumentTable
-from observations.models import Observation
+from apps.instruments.models import Instrument
+from apps.instruments.tables import InstrumentTable
+from apps.observations.models import Observation
 
 import os, sys
 import logging

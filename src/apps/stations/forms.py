@@ -9,10 +9,10 @@
 from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
-from stations.models import Station
+from apps.stations.models import Station
 
-from instruments.models import Instrument
-from instrumenttypes.models import InstrumentType
+from apps.instruments.models import Instrument
+from apps.instrumenttypes.models import InstrumentType
 
 instr_type_set = InstrumentType.objects.all()
 

@@ -8,11 +8,11 @@
 # ----------------------------------------------------------------------------
 from django.db import models
 
-from stations.models import Station
-from instruments.models import Instrument
-from bands.models import Band
-from datatypes.models import DataType
-from centerfrequencies.models import CenterFrequency
+from apps.stations.models import Station
+from apps.instruments.models import Instrument
+from apps.bands.models import Band
+from apps.datatypes.models import DataType
+from apps.centerfrequencies.models import CenterFrequency
 
 class Observation(models.Model):
     #

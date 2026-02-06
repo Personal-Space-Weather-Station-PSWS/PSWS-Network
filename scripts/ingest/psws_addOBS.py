@@ -12,9 +12,20 @@
 
 import os, sys
 from pathlib import Path
+from dotenv import load_dotenv
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT))
+# SCRIPTS_ROOT_DIR is 1 level up from scripts/ingest/
+SCRIPTS_ROOT_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(SCRIPTS_ROOT_DIR))
+
+# Load environment variables from scripts/.env
+load_dotenv(SCRIPTS_ROOT_DIR / "scripts.env")
+
+# Configuration from environment variables
+LOG_PATH = os.getenv("LOG_PATH")
+
+if not LOG_PATH:
+    raise EnvironmentError("LOG_PATH not set in scripts.env")
 
 # Django bootstrap to set up environment for Database access
 from _bootstrap_django import bootstrap 
@@ -31,7 +42,9 @@ from datetime import datetime as dt
 
 def writeLog(theMessage):
     timestamp = dt.now(timezone.utc).isoformat()[0:19]
-    f = open("/var/log/watchdog/watchdog.log", "a")
+    # Ensure log directory exists
+    os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+    f = open(LOG_PATH, "a")
     f.write(timestamp + " " + theMessage + "\n")
     f.close()
 

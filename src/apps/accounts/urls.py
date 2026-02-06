@@ -12,7 +12,7 @@ from django.contrib.auth import urls
 from django.urls import path
 from . import views
 from .views import UserListView 
-from core.views import under_construction
+from apps.core.views import under_construction
 
 urlpatterns = [
     path('', include('django.contrib.auth.urls')),

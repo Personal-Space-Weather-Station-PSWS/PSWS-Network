@@ -1,0 +1,265 @@
+# Enhanced Dependabot Configuration for PSWS-Network
+# Optimized for security best practices in educational and research environments
+# Author: Evan (University of Alabama Cybersecurity)
+# Documentation: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+
+version: 2
+
+# Registries section for private package sources (if needed)
+# registries:
+#   python-private:
+#     type: python-index
+#     url: https://pypi.org/simple
+#     username: ${{secrets.PYPI_USERNAME}}
+#     password: ${{secrets.PYPI_PASSWORD}}
+
+updates:
+  # ============================================================================
+  # Python Dependencies (Django Application)
+  # ============================================================================
+  - package-ecosystem: "pip"
+    directory: "/"
+    
+    # Schedule: Weekly updates on Monday mornings (CST)
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Chicago"
+    
+    # Pull Request Management
+    open-pull-requests-limit: 10
+    pull-request-branch-name:
+      separator: "-"
+    
+    # Code Review Settings
+    reviewers:
+      - "Personal-Space-Weather-Station-PSWS/maintainers"
+    assignees:
+      - "Personal-Space-Weather-Station-PSWS/maintainers"
+    
+    # Labeling Strategy
+    labels:
+      - "dependencies"
+      - "python"
+      - "automated"
+    
+    # Milestone assignment (optional)
+    # milestone: 2
+    
+    # Commit Message Configuration
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+    
+    # ========================================
+    # Dependency Grouping Strategy
+    # ========================================
+    groups:
+      # Django Core and Extensions
+      django-framework:
+        patterns:
+          - "Django"
+          - "django-*"
+        exclude-patterns:
+          - "django-debug-toolbar"  # Keep separate for dev dependency
+      
+      # Database Drivers
+      database:
+        patterns:
+          - "psycopg*"
+          - "sqlparse*"
+          - "mysqlclient*"
+      
+      # Web Server and WSGI
+      web-server:
+        patterns:
+          - "gunicorn*"
+          - "uvicorn*"
+          - "whitenoise*"
+      
+      # Security-Critical Dependencies
+      security-critical:
+        patterns:
+          - "cryptography*"
+          - "PyJWT*"
+          - "certifi*"
+          - "urllib3*"
+          - "requests*"
+          - "pycryptodome*"
+        # These get security updates immediately
+        update-types:
+          - "security"
+      
+      # Data Processing Libraries
+      data-processing:
+        patterns:
+          - "numpy*"
+          - "pandas*"
+          - "scipy*"
+          - "matplotlib*"
+      
+      # API and Serialization
+      api-tools:
+        patterns:
+          - "djangorestframework*"
+          - "django-rest-*"
+          - "drf-*"
+      
+      # Testing Framework
+      testing-framework:
+        patterns:
+          - "pytest*"
+          - "coverage*"
+          - "tox*"
+          - "factory-boy*"
+          - "faker*"
+        update-types:
+          - "minor"
+          - "patch"
+      
+      # Development Tools
+      dev-tools:
+        patterns:
+          - "black*"
+          - "flake8*"
+          - "pylint*"
+          - "isort*"
+          - "pre-commit*"
+          - "django-debug-toolbar*"
+        update-types:
+          - "minor"
+          - "patch"
+    
+    # ========================================
+    # Security Configuration
+    # ========================================
+    # Allow all security updates immediately
+    # insecure-external-code-execution: allow
+    
+    # Ignore specific dependency updates
+    ignore:
+      # Prevent major Django version jumps without manual review
+      - dependency-name: "Django"
+        update-types: ["version-update:semver-major"]
+      
+      # Example: Pin to specific version if needed for compatibility
+      # - dependency-name: "psycopg2-binary"
+      #   versions: [">=2.9.0", "<3.0.0"]
+    
+    # Version Strategy
+    versioning-strategy: increase
+    
+    # Allow dependencies from requirements.txt only
+    # directories:
+    #   - "/"
+    #   - "/deploy"
+
+  # ============================================================================
+  # GitHub Actions Workflows
+  # ============================================================================
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Chicago"
+    
+    open-pull-requests-limit: 5
+    
+    reviewers:
+      - "Personal-Space-Weather-Station-PSWS/maintainers"
+    
+    labels:
+      - "dependencies"
+      - "ci-cd"
+      - "github-actions"
+    
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    
+    groups:
+      actions-core:
+        patterns:
+          - "actions/*"
+      
+      security-scanning:
+        patterns:
+          - "github/codeql-action*"
+          - "ossf/scorecard-action*"
+          - "aquasecurity/trivy-action*"
+
+  # ============================================================================
+  # Docker Dependencies
+  # ============================================================================
+  - package-ecosystem: "docker"
+    directory: "/"
+    
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Chicago"
+    
+    open-pull-requests-limit: 5
+    
+    reviewers:
+      - "Personal-Space-Weather-Station-PSWS/maintainers"
+    
+    labels:
+      - "dependencies"
+      - "docker"
+      - "infrastructure"
+    
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    
+    # Group base images together
+    groups:
+      base-images:
+        patterns:
+          - "python*"
+          - "alpine*"
+          - "debian*"
+
+  # ============================================================================
+  # Optional: NPM/JavaScript (if using frontend assets)
+  # ============================================================================
+  # - package-ecosystem: "npm"
+  #   directory: "/"
+  #   schedule:
+  #     interval: "weekly"
+  #     day: "monday"
+  #     time: "09:00"
+  #     timezone: "America/Chicago"
+  #   open-pull-requests-limit: 10
+  #   reviewers:
+  #     - "Personal-Space-Weather-Station-PSWS/maintainers"
+  #   labels:
+  #     - "dependencies"
+  #     - "javascript"
+  #   commit-message:
+  #     prefix: "npm"
+  #   groups:
+  #     frontend:
+  #       patterns:
+  #         - "@types/*"
+  #         - "typescript*"
+
+# ============================================================================
+# Security Best Practices Notes
+# ============================================================================
+# 1. Enable Dependabot security updates in repository settings
+# 2. Configure branch protection rules to require reviews
+# 3. Set up CodeQL scanning for additional security analysis
+# 4. Consider using GitHub Advanced Security features
+# 5. Monitor Dependabot alerts regularly
+# 6. Test updates in staging before merging to main
+# 7. Keep a SECURITY.md file updated with vulnerability reporting procedures
+# 8. Use signed commits for supply chain security
+# ============================================================================
