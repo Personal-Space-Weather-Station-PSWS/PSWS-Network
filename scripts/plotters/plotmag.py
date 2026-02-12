@@ -14,7 +14,7 @@ import matplotlib.ticker as ticker
 import sys
 import argparse
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 import zipfile
 from dotenv import load_dotenv
 
@@ -47,8 +47,9 @@ def writeLog(theMessage):
     else:
         raise ValueError("LOG_PATH must include a directory")
 
-    timestamp = dt.datetime.now(dt.timezone.utc).isoformat()
-    with open(LOG_PATH, "a") as f:
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    with open(LOG_PATH, "a", encoding="utf-8") as f:
         f.write(f"{timestamp} {theMessage}\n")
 
 

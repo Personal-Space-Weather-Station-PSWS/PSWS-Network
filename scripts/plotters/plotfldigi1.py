@@ -9,7 +9,6 @@
 
 # Imports needed for plotting graphs from fldigi csv files
 
-import datetime
 
 import pytz
 
@@ -27,8 +26,7 @@ from dotenv import load_dotenv
 import numpy as np
 import digital_rf as drf
 
-from   datetime import datetime, timedelta
-import datetime as dt
+from datetime import datetime, timedelta, timezone
 
 import math
 import os, tempfile
@@ -88,8 +86,9 @@ def writeLog(theMessage):
     else:
         raise ValueError("LOG_PATH must include a directory")
 
-    timestamp = dt.datetime.now(dt.timezone.utc).isoformat()
-    with open(LOG_PATH, "a") as f:
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    with open(LOG_PATH, "a", encoding="utf-8") as f:
         f.write(f"{timestamp} {theMessage}\n")
 
 target_data_path = '/home/N000015'
