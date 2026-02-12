@@ -35,12 +35,8 @@ from _bootstrap_django import bootstrap
 bootstrap()
 
 PLOT_PATH = os.getenv("PLOT_PATH")
-LOG_PATH = os.getenv("LOG_PATH")
-
 if not PLOT_PATH:
     raise EnvironmentError("PLOT_PATH not set in scripts.env")
-if not LOG_PATH:
-    raise EnvironmentError("LOG_PATH not set in scripts.env")
 
 # Imports necessary modules from PSWS database
 from centerfrequencies.models 	import *

@@ -41,9 +41,12 @@ plot_output_path = os.path.join(PLOT_PATH, "mag")
 
 
 def writeLog(theMessage):
-    timestamp = datetime.now().isoformat()[0:19]
+    log_dir = os.path.dirname(LOG_PATH)
+    os.makedirs(log_dir, exist_ok=True)
+
+    timestamp = dt.datetime.utcnow().replace(tzinfo=pytz.utc).isoformat()
     with open(LOG_PATH, "a") as f:
-        f.write(timestamp + " " + theMessage + "\n")
+        f.write(f"{timestamp} {theMessage}\n")
 
 
 def open_maybe_zip(path):

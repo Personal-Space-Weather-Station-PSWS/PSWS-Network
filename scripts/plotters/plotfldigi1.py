@@ -82,9 +82,12 @@ mpl.rcParams['axes.xmargin']     = 0
 
 print("Logging")
 def writeLog(theMessage):
+    log_dir = os.path.dirname(LOG_PATH)
+    os.makedirs(log_dir, exist_ok=True)
+
     timestamp = dt.datetime.utcnow().replace(tzinfo=pytz.utc).isoformat()
     with open(LOG_PATH, "a") as f:
-        f.write(timestamp + " " + theMessage + "\n")
+        f.write(f"{timestamp} {theMessage}\n")
 
 target_data_path = '/home/N000015'
 target_data_file = '2021-03-29T000000Z_N0000015_G1_FN20mp_FRQ_WWV10.csv'
