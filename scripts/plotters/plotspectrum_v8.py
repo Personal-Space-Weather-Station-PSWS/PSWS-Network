@@ -20,15 +20,27 @@ import maidenhead as mh
 import sys, getopt, os
 
 from pytz import timezone
+from dotenv import load_dotenv
 
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
+env_path = Path(__file__).resolve().parent.parent / 'scripts.env'
+load_dotenv(dotenv_path=env_path)
+
 # Django bootstrap to set up environment for Database access
 from _bootstrap_django import bootstrap 
-bootstrap() 
+bootstrap()
+
+PLOT_PATH = os.getenv("PLOT_PATH")
+LOG_PATH = os.getenv("LOG_PATH")
+
+if not PLOT_PATH:
+    raise EnvironmentError("PLOT_PATH not set in scripts.env")
+if not LOG_PATH:
+    raise EnvironmentError("LOG_PATH not set in scripts.env") 
 
 # Imports necessary modules from PSWS database
 from centerfrequencies.models 	import *
@@ -37,8 +49,7 @@ from stations.models 		import *
 from instruments.models       	import *
 from instrumenttypes.models   	import *
 
-plot_output_path= "/psws/psws/media/plots" # for use on pswsnetwork server
-#plot_output_path = "C:\\temp"  # test
+plot_output_path = PLOT_PATH  # from environment variable
 
 # Retrieve supplied arg(s)
 # Remove the first arg from the list of command line args

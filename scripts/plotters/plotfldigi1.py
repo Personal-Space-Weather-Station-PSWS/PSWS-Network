@@ -23,6 +23,7 @@ import matplotlib.colors
 from   matplotlib.gridspec import GridSpec
 
 from   pytz import timezone
+from dotenv import load_dotenv
 import numpy as np
 import digital_rf as drf
 
@@ -44,9 +45,20 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
+env_path = Path(__file__).resolve().parent.parent / 'scripts.env'
+load_dotenv(dotenv_path=env_path)
+
 # Django bootstrap to set up environment for Database access
 from _bootstrap_django import bootstrap 
-bootstrap() 
+bootstrap()
+
+PLOT_PATH = os.getenv("PLOT_PATH")
+LOG_PATH = os.getenv("LOG_PATH")
+
+if not PLOT_PATH:
+    raise EnvironmentError("PLOT_PATH not set in scripts.env")
+if not LOG_PATH:
+    raise EnvironmentError("LOG_PATH not set in scripts.env") 
 
 # Imports necessary modules from PSWS database
 from centerfrequencies.models 	import *
@@ -70,11 +82,9 @@ mpl.rcParams['axes.xmargin']     = 0
 
 print("Logging")
 def writeLog(theMessage):
-  #  timestamp = dt.datetime.now(timezone.utc).isoformat()[0:19]
-    timestamp = dt.datetime.utcnow().replace(tzinfo=pytz.utc)
-    f = open("watchdog.log", "a")
-    f.write(str(timestamp) + " " + theMessage + "\n")
-    f.close()
+    timestamp = dt.datetime.utcnow().replace(tzinfo=pytz.utc).isoformat()
+    with open(LOG_PATH, "a") as f:
+        f.write(timestamp + " " + theMessage + "\n")
 
 target_data_path = '/home/N000015'
 target_data_file = '2021-03-29T000000Z_N0000015_G1_FN20mp_FRQ_WWV10.csv'
@@ -83,8 +93,7 @@ writeLog("start CSV plotter")
 
 # Prepare variables from supplied arguments
 
-plot_output_path= "/psws/psws/media/plots" # for use on pswsnetwork server
-#plot_output_path = "C:\\temp"  # test
+plot_output_path = PLOT_PATH  # from environment variable
 
 # Retrieve supplied arg(s)
 # Remove the first arg from the list of command line args
