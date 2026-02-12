@@ -42,9 +42,12 @@ plot_output_path = os.path.join(PLOT_PATH, "mag")
 
 def writeLog(theMessage):
     log_dir = os.path.dirname(LOG_PATH)
-    os.makedirs(log_dir, exist_ok=True)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+    else:
+        raise ValueError("LOG_PATH must include a directory")
 
-    timestamp = dt.datetime.utcnow().replace(tzinfo=pytz.utc).isoformat()
+    timestamp = dt.datetime.now(dt.timezone.utc).isoformat()
     with open(LOG_PATH, "a") as f:
         f.write(f"{timestamp} {theMessage}\n")
 
