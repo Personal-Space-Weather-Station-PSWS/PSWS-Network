@@ -11,14 +11,46 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework import status
 from django.http import FileResponse
-from datetime import datetime
-import tempfile, os, zipfile
+from datetime import datetime, timezone
+import tempfile, os, re, zipfile
 
 from apps.stations.models import Station
 from apps.observations.models import Observation
 
+# Allowed base directories for observation files
+ALLOWED_BASE_DIRS = [
+    '/home',
+]
+
+def _safe_observation_path(obs):
+    """
+    Construct and validate a file path from an observation record.
+    Returns the resolved path if it is within an allowed base directory,
+    or None if the path is invalid or attempts directory traversal.
+    """
+    try:
+        raw_path = '/'.join(obs.path.split('/')[:-1]) + '/' + obs.fileName
+        resolved = os.path.realpath(raw_path)
+        if any(resolved.startswith(os.path.realpath(base) + os.sep) for base in ALLOWED_BASE_DIRS):
+            return resolved
+    except (TypeError, AttributeError):
+        pass
+    writeLog(f"PATH VALIDATION FAILED for observation {obs.id}: attempted path outside allowed directories")
+    return None
+
+def writeLog(theMessage):
+    timestamp = datetime.now(timezone.utc).isoformat()[0:19]
+    #log_dir = '/var/log/api'
+    #os.makedirs(log_dir, exist_ok=True)
+    f = open("/srv/PSWS-Network/logs/observations_api.log", "a")
+    f.write(timestamp + " " + theMessage + "\n")
+    f.close()
+
 class ObservationDownloadAPIView(APIView):
     throttle_classes = [AnonRateThrottle]
+    
+    # Size threshold for multiple file downloads (in bytes)
+    MAX_MULTI_FILE_SIZE = 500 * 1024 * 1024  # 500 MB
 
     def get(self, request, format=None):
         '''
@@ -55,7 +87,7 @@ class ObservationDownloadAPIView(APIView):
 
         4. Download with instrument filter:
         curl -o output.zip \
-        "https://pswsnetwork.eng.ua.edu/observations/downloadapi/?station_id=S000028&instrument_id=1&start_date=2024-01-01&end_date=2024-01-31"
+        "https://pswsnetwork.eng.ua.edu/observations/downloadapi/?station_id=S000028&instrument_id=31&start_date=2024-01-01&end_date=2024-01-31"
 
         WGET EXAMPLES:
         
@@ -68,6 +100,13 @@ class ObservationDownloadAPIView(APIView):
         - No matches: HTTP 404 with error message
         - Invalid parameters: HTTP 400 with error details
         '''
+        # Log incoming request
+        writeLog("="*80)
+        writeLog("NEW API REQUEST RECEIVED")
+        writeLog(f"Client IP: {request.META.get('REMOTE_ADDR', 'Unknown')}")
+        writeLog(f"User Agent: {request.META.get('HTTP_USER_AGENT', 'Unknown')}")
+        writeLog(f"Query Parameters: {dict(request.query_params)}")
+        
         # REQUIRED PARAMETERS: Extract and validate date range
         start_date = request.query_params.get("start_date")
         end_date = request.query_params.get("end_date")
@@ -85,8 +124,14 @@ class ObservationDownloadAPIView(APIView):
         instrument_id = request.query_params.get("instrument_id")
         frequency = request.query_params.get("frequency")
 
+        writeLog(f"Extracted parameters - start_date: {start_date}, end_date: {end_date}, "
+                        f"station_id: {station_id}, lat_min: {lat_min}, lat_max: {lat_max}, "
+                        f"lon_min: {lon_min}, lon_max: {lon_max}, instrument_id: {instrument_id}, "
+                        f"frequency: {frequency}")
+
         # VALIDATION: Check required date parameters
         if not (start_date and end_date):
+            writeLog("VALIDATION FAILED: Missing start_date or end_date parameters")
             return Response({"detail": "Missing start_date or end_date parameters"}, status=status.HTTP_400_BAD_REQUEST)
 
         # VALIDATION: Parse and validate date format (YYYY-MM-DD)
@@ -95,31 +140,48 @@ class ObservationDownloadAPIView(APIView):
         try:
             start_dt = datetime.strptime(start_date, "%Y-%m-%d")
             end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-        except ValueError:
+            writeLog(f"Date parsing successful - start_dt: {start_dt}, end_dt: {end_dt}")
+        except ValueError as e:
+            writeLog(f"VALIDATION FAILED: Invalid date format - {e}")
             return Response({"detail": "Dates must be in YYYY-MM-DD format"}, status=status.HTTP_400_BAD_REQUEST)
 
         # VALIDATION: Ensure logical date range
         if end_dt < start_dt:
+            writeLog(f"VALIDATION FAILED: End date {end_dt} is before start date {start_dt}")
             return Response({"detail": "End date must be after start date"}, status=status.HTTP_400_BAD_REQUEST)
 
         # INITIAL QUERY: Filter observations by date range
         # This filters on the observation's start and end dates
+        writeLog(f"Querying observations between {start_dt.date()} and {end_dt.date()}")
         observations_in_range = Observation.objects.filter(
             startDate__gte=start_dt,
             endDate__lte=end_dt
         )
+        writeLog(f"Initial date range query returned {observations_in_range.count()} observations")
 
         # VALIDATION: Ensure mutual exclusivity between station_id and lat/lon filtering
         # This prevents conflicting filter criteria that could lead to unexpected results
         if station_id and (lat_min or lat_max or lon_min or lon_max):
+            writeLog("VALIDATION FAILED: Both station_id and lat/lon parameters provided")
             return Response({"detail": "Invalid parameters: must choose either station_id or latitude and longitude range"})
 
         # STATION FILTERING: Filter by specific station ID (case-insensitive)
         # Example test case: station_id="S000028" should match station with ID "s000028" or "S000028"
         if station_id:
+            writeLog(f"Applying station filter: {station_id}")
             observations_in_range = observations_in_range.filter(
                 station__station_id__iexact=station_id
             )
+            writeLog(f"After station filter: {observations_in_range.count()} observations")
+            
+            # Check if station exists
+            if not observations_in_range.exists():
+                # Verify if the station exists at all
+                station_exists = Station.objects.filter(station_id__iexact=station_id).exists()
+                if not station_exists:
+                    writeLog(f"Station '{station_id}' not found in database")
+                else:
+                    writeLog(f"Station '{station_id}' exists but has no observations in date range")
         # GEOGRAPHIC FILTERING: Filter by latitude/longitude bounding box
         # All four coordinates must be provided for geographic filtering
         # Example test cases:
@@ -127,6 +189,7 @@ class ObservationDownloadAPIView(APIView):
         # - lat_min=25.0, lat_max=49.0, lon_min=-125.0, lon_max=-66.0 (Continental US)
         # - lat_min=40.0, lat_max=41.0, lon_min=-74.0, lon_max=-73.0 (NYC area)
         elif lat_min and lat_max and lon_min and lon_max:
+            writeLog(f"Applying geographic filter: lat [{lat_min}, {lat_max}], lon [{lon_min}, {lon_max}]")
             try:
                 # Convert to float to ensure proper numeric comparison
                 lat_min_f = float(lat_min)
@@ -134,20 +197,26 @@ class ObservationDownloadAPIView(APIView):
                 lon_min_f = float(lon_min)
                 lon_max_f = float(lon_max)
                 
+                writeLog(f"Parsed geographic coordinates: lat [{lat_min_f}, {lat_max_f}], lon [{lon_min_f}, {lon_max_f}]")
+                
                 # VALIDATION: Check coordinate bounds and logical consistency
                 # Latitude must be between -90 and 90 degrees
                 if not (-90 <= lat_min_f <= 90 and -90 <= lat_max_f <= 90):
+                    writeLog(f"VALIDATION FAILED: Latitude values out of bounds - lat_min: {lat_min_f}, lat_max: {lat_max_f}")
                     return Response({"detail": "Latitude values must be between -90 and 90 degrees"}, status=status.HTTP_400_BAD_REQUEST)
                 
                 # Longitude must be between -180 and 180 degrees
                 if not (-180 <= lon_min_f <= 180 and -180 <= lon_max_f <= 180):
+                    writeLog(f"VALIDATION FAILED: Longitude values out of bounds - lon_min: {lon_min_f}, lon_max: {lon_max_f}")
                     return Response({"detail": "Longitude values must be between -180 and 180 degrees"}, status=status.HTTP_400_BAD_REQUEST)
                 
                 # Min values must be less than or equal to max values
                 if lat_min_f > lat_max_f:
+                    writeLog(f"VALIDATION FAILED: lat_min ({lat_min_f}) > lat_max ({lat_max_f})")
                     return Response({"detail": "lat_min must be less than or equal to lat_max"}, status=status.HTTP_400_BAD_REQUEST)
                 
                 if lon_min_f > lon_max_f:
+                    writeLog(f"VALIDATION FAILED: lon_min ({lon_min_f}) > lon_max ({lon_max_f})")
                     return Response({"detail": "lon_min must be less than or equal to lon_max"}, status=status.HTTP_400_BAD_REQUEST)
                 
                 # Apply geographic filter using validated coordinates
@@ -157,60 +226,136 @@ class ObservationDownloadAPIView(APIView):
                     station__longitude__gte=lon_min_f,
                     station__longitude__lte=lon_max_f
                 )
-            except (ValueError, TypeError):
+                writeLog(f"After geographic filter: {observations_in_range.count()} observations")
+            except (ValueError, TypeError) as e:
+                writeLog(f"VALIDATION FAILED: Invalid lat/lon values - {e}")
                 return Response({"detail": "Latitude and longitude values must be valid numbers"}, status=status.HTTP_400_BAD_REQUEST)
         else:
+            writeLog("VALIDATION FAILED: No valid location filter provided (neither station_id nor complete lat/lon range)")
             return Response({"detail": "Invalid parameters: must include either station_id or latitude and longitude range"}, status=status.HTTP_400_BAD_REQUEST)
         
         # INSTRUMENT FILTERING: Filter by specific instrument ID if provided
         # Example test case: instrument_id=1 should return only observations from instrument with ID 1
         if instrument_id:
+            writeLog(f"Applying instrument filter: {instrument_id}")
             try:
                 instrument_id_int = int(instrument_id)
                 observations_in_range = observations_in_range.filter(
                     instrument__id=instrument_id_int
                 )
-            except (ValueError, TypeError):
+                writeLog(f"After instrument filter: {observations_in_range.count()} observations")
+            except (ValueError, TypeError) as e:
+                writeLog(f"VALIDATION FAILED: Invalid instrument_id - {e}")
                 return Response({"detail": "instrument_id must be a valid integer"}, status=status.HTTP_400_BAD_REQUEST)
         
         # FREQUENCY FILTERING: Filter by center frequency if provided
         # Note: This filters on the centerFrequency field value in MHz
         if frequency:
+            writeLog(f"Applying frequency filter: {frequency} MHz")
             try:
                 frequency_decimal = float(frequency)
                 # Validate frequency range (assuming reasonable RF frequencies in MHz)
-                if frequency_decimal <= 0 or frequency_decimal > 300000:  # 0 Hz to 300 GHz
-                    return Response({"detail": "Frequency must be a positive value in MHz (0-300000)"}, status=status.HTTP_400_BAD_REQUEST)
-                
+                if frequency_decimal <= 0 or frequency_decimal > 99.999:  # >0 Hz to  <=99.999 MHz
+                    writeLog(f"VALIDATION FAILED: Frequency out of range - {frequency_decimal} MHz")
+                    return Response({"detail": "Frequency must be a positive value in MHz (0-99.999)"}, status=status.HTTP_400_BAD_REQUEST)
+
                 # Filter observations by center frequency
                 # Note: The relationship is observations -> centerFrequency (ManyToMany) -> centerFrequency field
                 observations_in_range = observations_in_range.filter(
                     centerFrequency__centerFrequency=frequency_decimal
                 )
-            except (ValueError, TypeError):
+                writeLog(f"After frequency filter: {observations_in_range.count()} observations")
+            except (ValueError, TypeError) as e:
+                writeLog(f"VALIDATION FAILED: Invalid frequency value - {e}")
                 return Response({"detail": "Frequency must be a valid decimal number in MHz"}, status=status.HTTP_400_BAD_REQUEST)
 
         # CHECK RESULTS: Verify that observations were found
         if not observations_in_range.exists():
+            writeLog("NO OBSERVATIONS FOUND matching the specified criteria")
             return Response({"detail": "Observation data not found."}, status=status.HTTP_404_NOT_FOUND)
 
         # RETRIEVE MATCHING OBSERVATIONS
         observations = list(observations_in_range.all())
 
+        writeLog(f"FOUND {len(observations)} observations matching criteria")
         print(f"Found {len(observations)} observations matching criteria")
         for i, obs in enumerate(observations):
-            print(f"  Observation {i+1}: {obs.fileName} | Path: {obs.path} | Start: {obs.startDate.date()} | End: {obs.endDate.date()}")
+            log_msg = f"  Observation {i+1}: {obs.fileName} | Path: {obs.path} | Start: {obs.startDate.date()} | End: {obs.endDate.date()}"
+            writeLog(log_msg)
+            print(log_msg)
+
+        # SIZE VALIDATION: Check total size for multiple files
+        if len(observations) > 1:
+            writeLog(f"Multiple files detected ({len(observations)}), checking total size...")
+            total_size = 0
+            existing_files_count = 0
+            
+            print(f"Checking total size (threshold: {self.MAX_MULTI_FILE_SIZE / (1024*1024):.0f} MB)...")
+            
+            for obs in observations:
+                # Use database size if available, otherwise check file on disk
+                file_size = 0
+                
+                if hasattr(obs, 'size') and obs.size:
+                    file_size = obs.size
+                    log_msg = f"  {obs.fileName}: {file_size / (1024*1024):.2f} MB (from database)"
+                    writeLog(log_msg)
+                    print(log_msg)
+                else:
+                    # Construct file path to check on disk (with path traversal protection)
+                    file_path = _safe_observation_path(obs)
+                    if file_path is None:
+                        log_msg = f"  {obs.fileName}: Path validation failed, skipping from size calculation"
+                        writeLog(log_msg)
+                        print(log_msg)
+                        continue
+                    if os.path.exists(file_path):
+                        file_size = os.path.getsize(file_path)
+                        log_msg = f"  {obs.fileName}: {file_size / (1024*1024):.2f} MB (from disk)"
+                        writeLog(log_msg)
+                        print(log_msg)
+                    else:
+                        log_msg = f"  {obs.fileName}: File not found at {file_path}, skipping from size calculation"
+                        writeLog(log_msg)
+                        print(log_msg)
+                        continue
+                
+                total_size += file_size
+                existing_files_count += 1
+            
+            log_msg = f"Total size of {existing_files_count} existing files: {total_size / (1024*1024):.2f} MB"
+            writeLog(log_msg)
+            print(log_msg)
+            
+            # Check if total size exceeds threshold
+            if total_size > self.MAX_MULTI_FILE_SIZE:
+                writeLog(f"SIZE LIMIT EXCEEDED: {total_size / (1024*1024):.2f} MB > {self.MAX_MULTI_FILE_SIZE / (1024*1024):.0f} MB")
+                return Response({
+                    "detail": "Request exceeds maximum file size limit for multiple file downloads.",
+                    "error_info": {
+                        "requested_size_mb": round(total_size / (1024*1024), 2),
+                        "threshold_mb": round(self.MAX_MULTI_FILE_SIZE / (1024*1024), 0),
+                        "files_count": existing_files_count,
+                        "suggestion": "Please use a smaller date range or download individual files."
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
 
         # MULTIPLE FILES: Create ZIP archive when multiple observations found
         if len(observations) > 1:
+            writeLog("Creating ZIP archive for multiple files")
             temp_dir = tempfile.gettempdir()
-            # Create descriptive filename based on search criteria
-            if station_id:
-                zip_filename = f"observations_{station_id}_{start_date}_{end_date}.zip"
+            # Create descriptive filename based on search criteria (sanitize user inputs)
+            safe_station = re.sub(r'[^\w\-]', '', station_id) if station_id else None
+            safe_start = re.sub(r'[^\w\-]', '', start_date)
+            safe_end = re.sub(r'[^\w\-]', '', end_date)
+            if safe_station:
+                zip_filename = f"observations_{safe_station}_{safe_start}_{safe_end}.zip"
             else:
-                zip_filename = f"observations_region_{start_date}_{end_date}.zip"
+                zip_filename = f"observations_region_{safe_start}_{safe_end}.zip"
             zip_path = os.path.join(temp_dir, zip_filename)
-            print(f"Creating ZIP archive: {zip_path}")
+            log_msg = f"Creating ZIP archive: {zip_path}"
+            writeLog(log_msg)
+            print(log_msg)
             
             files_added = 0
             files_processed = 0
@@ -219,44 +364,65 @@ class ObservationDownloadAPIView(APIView):
                 with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                     for obs in observations:
                         files_processed += 1
-                        print(f"Processing observation {files_processed}/{len(observations)}: {obs.fileName}")
+                        log_msg = f"Processing observation {files_processed}/{len(observations)}: {obs.fileName}"
+                        writeLog(log_msg)
+                        print(log_msg)
                         
-                        # VALIDATION: Only process ZIP files within date range # Removed since file formats may change?
+                        # VALIDATION: Only process ZIP files within date range # Removed since some files may not be .zip?
                         #file_extension = obs.fileName[-4:]
                         #if file_extension == '.zip':
                             
-                            # CONSTRUCT FILE PATH: Build full path to observation file
-                        file_path = '/'.join(obs.path.split('/')[:-1]) + '/' + obs.fileName
-                            # TEST CASE - developer is linux username
+                        # CONSTRUCT FILE PATH: Build full path to observation file (with path traversal protection)
+                        file_path = _safe_observation_path(obs)
+                        if file_path is None:
+                            log_msg = f"  ✗ Path validation failed for {obs.fileName}"
+                            writeLog(log_msg)
+                            print(log_msg)
+                            continue
+                        # TEST CASE - developer is linux username
                         #file_path = "/home/developer/S000028/magData/" + obs.fileName
-                        print(f"  File path: {file_path}")
+                        log_msg = f"  File path: {file_path}"
+                        writeLog(log_msg)
+                        print(log_msg)
                             
-                            # VALIDATION: Check file exists before adding to ZIP
+                        # VALIDATION: Check file exists before adding to ZIP
                         if os.path.exists(file_path):
                             try:
                                 zipf.write(file_path, arcname=obs.fileName)
                                 files_added += 1
-                                print(f"  ✓ Successfully added to ZIP")
+                                log_msg = f"  ✓ Successfully added to ZIP"
+                                writeLog(log_msg)
+                                print(log_msg)
                             except Exception as add_error:
-                                print(f"  ✗ Error adding file to ZIP: {add_error}")
+                                log_msg = f"  ✗ Error adding file to ZIP: {add_error}"
+                                writeLog(log_msg)
+                                print(log_msg)
                         else:
-                            print(f"  ✗ File not found at path")
+                            log_msg = f"  ✗ File not found at path"
+                            writeLog(log_msg)
+                            print(log_msg)
                         #else:
                         #    print(f"  ✗ File skipped (invalid extension or date range)")
                             
             except Exception as e:
-                print(f"Error creating ZIP file: {str(e)}")
-                return Response({"detail": f"Failed to generate zip file: {str(e)}"},
+                log_msg = f"CRITICAL ERROR creating ZIP file: {str(e)}"
+                writeLog(log_msg)
+                print(log_msg)
+                return Response({"detail": f"Failed to generate zip file"},
                                 status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            print(f"ZIP creation completed: {files_added}/{files_processed} files added to archive")
+            log_msg = f"ZIP creation completed: {files_added}/{files_processed} files added to archive"
+            writeLog(log_msg)
+            print(log_msg)
             
             # Check if any files were actually added
             if files_added == 0:
+                writeLog("NO FILES ADDED to ZIP archive - all files missing from filesystem")
                 return Response({"detail": "No valid observation files found to include in archive"},
                                 status=status.HTTP_404_NOT_FOUND)
 
             # RETURN ZIP FILE: Send ZIP archive as download with custom headers
+            writeLog(f"Successfully returning ZIP archive with {files_added} files")
             response = FileResponse(open(zip_path, 'rb'),
                                 as_attachment=True,
                                 filename=zip_filename,
@@ -268,30 +434,41 @@ class ObservationDownloadAPIView(APIView):
             response['X-Files-Added'] = str(files_added)
             response['X-Archive-Type'] = 'multiple-files'
             
+            writeLog("Request completed successfully - ZIP file sent")
+            writeLog("="*80)
             return response
 
         # SINGLE FILE: Return observation file directly
         else:
+            writeLog("Single file response - processing")
             obs = observations[0]
             #file_extension = obs.fileName[-4:]
             
-            # VALIDATION: Check file is within date range and is a ZIP file # Removed since file formats may change?
+            # VALIDATION: Check file is within date range and is a ZIP file # Removed since some files may not be .zip?
             #if not file_extension == '.zip':
             #    return Response({"detail": "Observation file not found or invalid."},
             #                    status=status.HTTP_404_NOT_FOUND)
-
-            # CONSTRUCT FILE PATH: Build full path to observation file
-            file_path = '/'.join(obs.path.split('/')[:-1]) + '/' + obs.fileName
+            
+            # CONSTRUCT FILE PATH: Build full path to observation file (with path traversal protection)
+            file_path = _safe_observation_path(obs)
+            if file_path is None:
+                writeLog(f"PATH VALIDATION FAILED for single file: {obs.fileName}")
+                return Response({"detail": "Observation file path is invalid."},
+                                status=status.HTTP_400_BAD_REQUEST)
             # TEST CASE - developer is linux username
             #file_path = "/home/developer/S000028/magData/" + obs.fileName
-            print(f"Serving single file: {file_path}")
+            log_msg = f"Serving single file: {file_path}"
+            writeLog(log_msg)
+            print(log_msg)
             
             # VALIDATION: Verify file exists on filesystem
             if not os.path.exists(file_path):
+                writeLog(f"FILE NOT FOUND on filesystem: {file_path}")
                 return Response({"detail": "Observation file not found on filesystem."},
                                 status=status.HTTP_404_NOT_FOUND)
             
             # RETURN SINGLE FILE: Send observation file as download with custom headers
+            writeLog(f"Successfully returning single file: {obs.fileName}")
             response = FileResponse(open(file_path, 'rb'),
                                 as_attachment=True,
                                 filename=obs.fileName,
@@ -303,4 +480,6 @@ class ObservationDownloadAPIView(APIView):
             response['X-Files-Added'] = '1'
             response['X-Archive-Type'] = 'single-file'
             
+            writeLog("Request completed successfully - single file sent")
+            writeLog("="*80)
             return response
