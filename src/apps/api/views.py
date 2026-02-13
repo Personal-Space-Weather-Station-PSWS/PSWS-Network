@@ -10,9 +10,9 @@ from django.shortcuts import render, redirect
 from rest_framework import permissions
 from rest_framework import generics
 from .serializers import StationSerializer, HeartbeatSerializer, StationStopSerializer
-from stations.models import Station
-from observations.models import Observation
-from datarequests.models import DataRequest
+from apps.stations.models import Station
+from apps.observations.models import Observation
+from apps.datarequests.models import DataRequest
 from rest_framework.response import Response
 from datetime import datetime, timedelta, timezone
 from django.conf import settings

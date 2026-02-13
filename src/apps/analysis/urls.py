@@ -8,7 +8,7 @@
 # ----------------------------------------------------------------------------
 from django.urls import path
 from . import views
-from core.views import under_construction
+from apps.core.views import under_construction
 
 urlpatterns = [
         # path('line_plot/', views.line_plot, name='line_plot'),

@@ -11,11 +11,11 @@ from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.views.generic.edit import UpdateView
 from datetime import datetime
-from instruments.models import Instrument
-from instruments.forms import InstrumentCreationForm
-from instrumenttypes.models import InstrumentType
-from stations.models import Station
-from observations.models import Observation
+from apps.instruments.models import Instrument
+from apps.instruments.forms import InstrumentCreationForm
+from apps.instrumenttypes.models import InstrumentType
+from apps.stations.models import Station
+from apps.observations.models import Observation
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
 from django_tables2 import SingleTableView

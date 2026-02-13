@@ -10,7 +10,7 @@ import django_tables2 as tables
 from .models import Instrument
 from django_tables2 import A
 from django_tables2.utils import Accessor
-from instrumenttypes.models import InstrumentType
+from apps.instrumenttypes.models import InstrumentType
 
 class InstrumentTable(tables.Table):
    # id = tables.LinkColumn('instrument_details', args=[A('station_id')])

@@ -7,7 +7,7 @@
 # The full license is in the LICENSE file, distributed with this software.
 # ----------------------------------------------------------------------------
 from django.db import models
-from accounts.models import Profile
+from apps.accounts.models import Profile
 
 # Create your models here.
 class DataRequest(models.Model):

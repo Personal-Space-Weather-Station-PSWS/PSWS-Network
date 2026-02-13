@@ -7,8 +7,8 @@
 # The full license is in the LICENSE file, distributed with this software.
 # ----------------------------------------------------------------------------
 from rest_framework import serializers
-from stations.models import Station
-from observations.models import Observation
+from apps.stations.models import Station
+from apps.observations.models import Observation
 
 class StationSerializer(serializers.ModelSerializer):
     class Meta:

@@ -8,8 +8,8 @@
 # ----------------------------------------------------------------------------
 from django.db import models
 
-from instrumenttypes.models import InstrumentType
-from stations.models import Station
+from apps.instrumenttypes.models import InstrumentType
+from apps.stations.models import Station
 
 # Create your models here.
 class Instrument(models.Model):

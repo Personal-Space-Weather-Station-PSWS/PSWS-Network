@@ -9,7 +9,7 @@
 import django_tables2 as tables
 from .models import Station
 from django_tables2 import A
-from instruments.models import Instrument
+from apps.instruments.models import Instrument
 
 class StationTable(tables.Table):
     class Meta:

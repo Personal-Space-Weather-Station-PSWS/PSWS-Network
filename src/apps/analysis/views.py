@@ -16,11 +16,11 @@ from django.utils.dateparse import parse_datetime
 from django.conf import settings
 from . import views
 import zipfile
-from stations.models import Station
-from observations.models import Observation
-from instruments.models import Instrument
-from instrumenttypes.models import InstrumentType
-from observations.tables import ObservationTable
+from apps.stations.models import Station
+from apps.observations.models import Observation
+from apps.instruments.models import Instrument
+from apps.instrumenttypes.models import InstrumentType
+from apps.observations.tables import ObservationTable
 from statistics import mean 
 
 # Declaration of cutoff hours for station status

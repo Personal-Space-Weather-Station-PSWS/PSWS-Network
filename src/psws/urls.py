@@ -9,7 +9,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic.base import RedirectView
-from api import views as apiviews
+from apps.api import views as apiviews
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
@@ -21,12 +21,12 @@ urlpatterns = [
     path('stations/', apiviews.StationList.as_view(), name='stationList'),
     path('heartbeat/', apiviews.StationHeartbeat.as_view(), name='heartbeat'),
     path('stop/', apiviews.StationStop.as_view(), name='stop'),
-    path('accounts/', include('accounts.urls')),
-    path('', include('accounts.urls')),
-    path('stations/', include('stations.urls')),
+    path('accounts/', include('apps.accounts.urls')),
+    path('', include('apps.accounts.urls')),
+    path('stations/', include('apps.stations.urls')),
     path('favicon.ico', favicon_view),
-    path('observations/', include('observations.urls')),
-    path('instruments/', include('instruments.urls')),
-    path('analysis/', include('analysis.urls')),
+    path('observations/', include('apps.observations.urls')),
+    path('instruments/', include('apps.instruments.urls')),
+    path('analysis/', include('apps.analysis.urls')),
     path("", include("apps.core.urls")),
 ] +  staticfiles_urlpatterns()
