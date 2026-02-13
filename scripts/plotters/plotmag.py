@@ -36,9 +36,7 @@ if not PLOT_PATH:
 if not LOG_PATH:
     raise EnvironmentError("LOG_PATH not set in scripts.env")
 
-# Then use them:
-plot_output_path = os.path.join(PLOT_PATH, "mag")
-
+plot_output_path = PLOT_PATH
 
 def writeLog(theMessage):
     log_dir = os.path.dirname(LOG_PATH)
