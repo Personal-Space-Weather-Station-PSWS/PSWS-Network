@@ -37,9 +37,9 @@ if not PLOT_PATH:
 from _bootstrap_django import bootstrap 
 bootstrap() 
 
-#from centerfrequencies.models import *
-from observations.models import *
-from datatypes.models import *
+#from apps.centerfrequencies.models import *
+from apps.observations.models import *
+from apps.datatypes.models import *
 #import datetime
 
 from datetime import timezone

@@ -31,8 +31,8 @@ if not LOG_PATH:
 from _bootstrap_django import bootstrap 
 bootstrap() 
 
-from observations.models import *
-from datatypes.models import *
+from apps.observations.models import *
+from apps.datatypes.models import *
 #import datetime
 
 from datetime import timezone
