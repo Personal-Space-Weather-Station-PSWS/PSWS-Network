@@ -39,11 +39,11 @@ if not PLOT_PATH:
     raise EnvironmentError("PLOT_PATH not set in scripts.env")
 
 # Imports necessary modules from PSWS database
-from centerfrequencies.models 	import *
-from observations.models 	import *
-from stations.models 		import *
-from instruments.models       	import *
-from instrumenttypes.models   	import *
+from apps.centerfrequencies.models 	import *
+from apps.observations.models 	import *
+from apps.stations.models 		import *
+from apps.instruments.models       	import *
+from apps.instrumenttypes.models   	import *
 
 plot_output_path = PLOT_PATH  # from environment variable
 
