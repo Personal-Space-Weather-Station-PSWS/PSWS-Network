@@ -159,9 +159,11 @@ class Command(BaseCommand):
 				self.stdout.write(result.stdout)
 		except subprocess.CalledProcessError as e:
 			self.stdout.write(self.style.ERROR(f"Failed to create directory: {e.stderr}"))
+			station.delete()  # Clean up the station if directory creation fails
 			return
 		except subprocess.TimeoutExpired:
 			self.stdout.write(self.style.ERROR("Station creation script timed out"))
+			station.delete()  # Clean up the station if script times out
 			return
 		
 		# # No longer need jailing as of 2026
