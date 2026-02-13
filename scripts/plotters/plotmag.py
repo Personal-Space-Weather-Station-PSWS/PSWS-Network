@@ -14,7 +14,7 @@ import matplotlib.ticker as ticker
 import sys
 import argparse
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 import zipfile
 from dotenv import load_dotenv
 
@@ -41,9 +41,16 @@ plot_output_path = os.path.join(PLOT_PATH, "mag")
 
 
 def writeLog(theMessage):
-    timestamp = datetime.now().isoformat()[0:19]
-    with open(LOG_PATH, "a") as f:
-        f.write(timestamp + " " + theMessage + "\n")
+    log_dir = os.path.dirname(LOG_PATH)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+    else:
+        raise ValueError("LOG_PATH must include a directory")
+
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    with open(LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(f"{timestamp} {theMessage}\n")
 
 
 def open_maybe_zip(path):
