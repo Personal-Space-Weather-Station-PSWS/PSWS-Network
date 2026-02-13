@@ -29,6 +29,7 @@ from apps.instruments.tables import InstrumentTable
 from apps.observations.models import Observation
 
 import os, sys
+import subprocess
 import logging
 logger = logging.getLogger(__name__)
 
@@ -138,7 +139,14 @@ def add_station_view(request):
             station.phone_number = form.cleaned_data.get('phone_number')
             station.create_date = datetime.now()
             station.save()
-            os.system('sudo ' + str(settings.BASE_DIR) + '/scripts/ingest/stationcreation4.sh ' + station.station_id + ' ' + station.station_pass)
+            station_creation_script = str(settings.BASE_DIR) + '/scripts/ingest/stationcreation4.sh'
+            subprocess.run(
+                ['sudo', station_creation_script, station.station_id, station.station_pass],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=True
+            )
             return redirect('stations')
     else:
         form = StationCreationForm()
