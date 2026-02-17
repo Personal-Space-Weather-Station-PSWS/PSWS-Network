@@ -11,7 +11,7 @@ sys.path.insert(0, str(SRC_DIR))
 sys.path.insert(0, str(APPS_DIR)) 
 
 def main():
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "psws.settings.dev")
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "psws.settings.prod")
     from django.core.management import execute_from_command_line
     execute_from_command_line(sys.argv)
 
