@@ -85,8 +85,7 @@ def writeLog(theMessage):
     timestamp = datetime.now(timezone.utc).isoformat()[0:19]
     #log_dir = '/var/log/api'
     #os.makedirs(log_dir, exist_ok=True)
-    #f = open("/srv/PSWS-Network/logs/observations_api.log", "a")
-    f = open("/home/developer/logs/psws_watchdog.log", "a")
+    f = open("/srv/PSWS-Network/logs/observations_api.log", "a")
     f.write(timestamp + " " + theMessage + "\n")
     f.close()
 
