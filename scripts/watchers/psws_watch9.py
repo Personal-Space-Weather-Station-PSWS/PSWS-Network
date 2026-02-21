@@ -250,12 +250,10 @@ class TriggerDirHandler(FileSystemEventHandler):
 # End of database section
 
 
-
-
                     try:
                         writeLog("Trigger graphing  program")
                         # This uses task spooler (ts) to make multiple plot jobs run in a queue
-                        graph_command = "ts /opt/venv311/bin/python3 /var/www/html/plotspectrum_v8.py -e " + \
+                        graph_command = "ts /opt/venv311/bin/python3 /srv/PSWS-Network/scripts/plotters/plotspectrum.py -e " + \
                             event.src_path  # plot path will be set in plotspectrum
                         writeLog("Running graph_command ----> " + graph_command)
                         os.system(graph_command)
