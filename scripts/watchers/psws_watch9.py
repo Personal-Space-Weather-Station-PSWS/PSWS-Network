@@ -249,7 +249,6 @@ class TriggerDirHandler(FileSystemEventHandler):
 
 # End of database section
 
-
                     try:
                         writeLog("Trigger graphing  program")
                         # This uses task spooler (ts) to make multiple plot jobs run in a queue
@@ -262,7 +261,6 @@ class TriggerDirHandler(FileSystemEventHandler):
                     except Exception as ex:
                         print("Exception: ", str(ex))
                         writeLog("Exception: " + str(ex))
-
 
 
                 elif event.src_path.rsplit('/')[-1][0] == 'm': # processing for "m" (magnetometer) type upload
