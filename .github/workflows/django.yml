@@ -2,14 +2,29 @@ name: Django CI
 
 on:
   push:
-    branches: [ "staging" ]
+    branches: [ "main", "staging" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "staging"]
 
 jobs:
   build:
 
     runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_DATABASE: psws
+          MARIADB_USER: psws_user
+          MARIADB_PASSWORD: psws_pass
+          MARIADB_ROOT_PASSWORD: root_pass
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mariadb-admin ping -h 127.0.0.1 -upsws_user -ppsws_pass"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
     strategy:
       max-parallel: 4
       matrix:
@@ -24,7 +39,16 @@ jobs:
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    - name: Run Tests
+        pip install -r requirements-ci.txt
+    - name: Run tests
+      env:
+        DJANGO_SETTINGS_MODULE: psws.settings.prod
+        PSWS_DB_ENGINE: django.db.backends.mysql
+        PSWS_DB_NAME: psws
+        PSWS_DB_USER: psws_user
+        PSWS_DB_PASSWORD: psws_pass
+        PSWS_DB_HOST: 127.0.0.1
+        PSWS_DB_PORT: "3306"
+        SECRET_KEY: ci
       run: |
         python manage.py test
