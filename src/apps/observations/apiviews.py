@@ -12,7 +12,7 @@ from rest_framework.throttling import AnonRateThrottle
 from rest_framework import status
 from django.http import FileResponse
 from datetime import datetime, timezone, timedelta
-import tempfile, os, re, zipfile
+import tempfile, os, re, zipfile, mimetypes
 
 from apps.stations.models import Station
 from apps.observations.models import Observation
@@ -51,14 +51,20 @@ def _safe_observation_path(obs):
     """
     try:
         # Spectrum / DRF observations: path IS the directory, fileName
-        # matches the directory name.  Check for this pattern first.
+        # matches the directory name.  Validate the path is within allowed
+        # dirs BEFORE making any filesystem calls to avoid timing-based
+        # information leakage about paths outside ALLOWED_BASE_DIRS.
         resolved_dir = os.path.realpath(obs.path)
         if (
-            os.path.isdir(resolved_dir)
+            _validate_within_allowed_dirs(resolved_dir)
+            and os.path.isdir(resolved_dir)
             and os.path.basename(resolved_dir) == obs.fileName
         ):
-            if _validate_within_allowed_dirs(resolved_dir):
-                return resolved_dir, True
+            return resolved_dir, True
+        if (
+            not _validate_within_allowed_dirs(resolved_dir)
+            and os.path.basename(resolved_dir) == obs.fileName
+        ):
             writeLog(
                 f"PATH VALIDATION FAILED (directory) for observation {obs.id}: "
                 f"{resolved_dir} is outside allowed directories"
@@ -83,21 +89,32 @@ def _safe_observation_path(obs):
 
 def writeLog(theMessage):
     timestamp = datetime.now(timezone.utc).isoformat()[0:19]
-    #log_dir = '/var/log/api'
-    #os.makedirs(log_dir, exist_ok=True)
-    f = open("/srv/PSWS-Network/logs/observations_api.log", "a")
-    f.write(timestamp + " " + theMessage + "\n")
-    f.close()
+    try:
+        #with open("/srv/PSWS-Network/logs/observations_api.log", "a") as f:
+        with open("/home/developer/logs/psws_watchdog.log", "a") as f:
+            f.write(timestamp + " " + theMessage + "\n")
+    except OSError:
+        # If the log file can't be written (permissions, disk full, etc.),
+        # silently continue rather than crashing the API request.
+        pass
 
 
 def _dir_size(path):
-    """Return the total size in bytes of all files under path (recursive)."""
+    """Return the total size in bytes of all files under path (recursive).
+
+    Symlinks are not followed to prevent traversal outside the observation
+    directory.  Files that become inaccessible between os.walk() and
+    os.path.getsize() are skipped with a log warning.
+    """
     total = 0
-    for dirpath, _dirnames, filenames in os.walk(path):
+    for dirpath, _dirnames, filenames in os.walk(path, followlinks=False):
         for fname in filenames:
             fp = os.path.join(dirpath, fname)
             if os.path.isfile(fp):
-                total += os.path.getsize(fp)
+                try:
+                    total += os.path.getsize(fp)
+                except OSError as e:
+                    writeLog(f"_dir_size: failed to get size for '{fp}': {e}")
     return total
 
 
@@ -105,15 +122,25 @@ def _add_directory_to_zip(zipf, dir_path, arc_prefix):
     """
     Recursively add every file inside dir_path to the open ZipFile
     zipf, storing them under arc_prefix/ inside the archive.
-    Returns the number of files added.
+    Returns the number of files successfully added.
+
+    Symlinks are not followed to prevent traversal outside the observation
+    directory.  Individual file errors (permissions, file removed mid-walk)
+    are logged and skipped rather than aborting the whole archive.
     """
     count = 0
-    for dirpath, _dirnames, filenames in os.walk(dir_path):
+    for dirpath, _dirnames, filenames in os.walk(dir_path, followlinks=False):
         for fname in filenames:
             full = os.path.join(dirpath, fname)
             arcname = os.path.join(arc_prefix, os.path.relpath(full, dir_path))
-            zipf.write(full, arcname=arcname)
-            count += 1
+            try:
+                zipf.write(full, arcname=arcname)
+                count += 1
+            except Exception as exc:
+                try:
+                    writeLog(f"ZIP write error for '{full}' as '{arcname}': {exc}")
+                except Exception:
+                    pass
     return count
 
 
@@ -121,7 +148,7 @@ def _zip_directory_to_tempfile(dir_path, arc_prefix):
     """
     Create a temporary ZIP of the directory at dir_path.
     Returns the path to the temporary ZIP file.
-    The caller is responsible for cleaning up t      he temp file.
+    The caller is responsible for cleaning up the temp file.
     """
     tmpf = tempfile.NamedTemporaryFile(
         prefix="obs_dir_", suffix=".zip", delete=False
@@ -633,10 +660,13 @@ class ObservationDownloadAPIView(APIView):
                 return Response({"detail": "Permission denied reading the observation file."}, status=status.HTTP_403_FORBIDDEN)
 
             writeLog(f"Successfully returning single file: {obs.fileName}")
+            mime_type, _ = mimetypes.guess_type(obs.fileName)
+            if not mime_type:
+                mime_type = "application/octet-stream"
             response = FileResponse(file_handle,
                                 as_attachment=True,
                                 filename=obs.fileName,
-                                content_type="application/zip")
+                                content_type=mime_type)
             
             # Add custom headers visible to user
             response['X-Files-Discovered'] = '1'
