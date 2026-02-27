@@ -31,4 +31,4 @@ jobs:
           file: .github/ci/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:ci-rocky9-py312
+            ghcr.io/${{ github.repository.toLowerCase() }}:ci-rocky9-py312
