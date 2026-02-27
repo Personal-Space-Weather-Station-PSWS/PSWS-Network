@@ -69,6 +69,18 @@ def open_maybe_zip(path):
 
 
 def load_dataframe(path):
+    def _looks_like_timestamp(value):
+        if pd.isna(value):
+            return False
+        candidate = str(value).strip().strip('"')
+        if not candidate:
+            return False
+        try:
+            pd.to_datetime(candidate)
+            return True
+        except Exception:
+            return False
+
     f, inner_name = open_maybe_zip(path)
 
     try:
@@ -77,22 +89,50 @@ def load_dataframe(path):
 
         if first == b"{":
             df = pd.read_json(f, lines=True)
-        else:
-            names = ["ts", "rt", "lt", "x", "y", "z"]
+            bx, by, bz = "x", "y", "z"
+            return df, inner_name, bx, by, bz
 
-            df = pd.read_csv(
-                f,
-                names=names,
-                quotechar='"',
-                skipinitialspace=True,
-                comment="#",
-                header=None,
-            )
+        df = pd.read_csv(
+            f,
+            header=None,
+            quotechar='"',
+            skipinitialspace=True,
+            comment="#",
+            encoding_errors="ignore",
+            engine="python",
+        )
 
-            try:
-                pd.to_datetime(df["ts"].iloc[0])
-            except Exception:
-                df = df.iloc[1:].reset_index(drop=True)
+        if df.empty:
+            raise ValueError("CSV file contains no data")
+
+        df = df.dropna(how="all").dropna(axis=1, how="all")
+
+        header_present = False
+        while len(df) > 0 and not _looks_like_timestamp(df.iloc[0, 0]):
+            header_present = True
+            df = df.iloc[1:]
+
+        if df.empty:
+            raise ValueError("No timestamped rows found in CSV file")
+
+        df = df.reset_index(drop=True)
+        df.columns = [f"col{i}" for i in range(df.shape[1])]
+        df = df.rename(columns={"col0": "ts"})
+        df["ts"] = df["ts"].astype(str).str.strip().str.strip('"')
+
+        fallback_indices = (3, 4, 5) if header_present else (2, 3, 4)
+        col_names = list(df.columns)
+
+        try:
+            bx_col = col_names[fallback_indices[0]]
+            by_col = col_names[fallback_indices[1]]
+            bz_col = col_names[fallback_indices[2]]
+        except IndexError:
+            raise ValueError(
+                "CSV file does not contain enough columns for magnetometer data"
+            ) from None
+
+        df = df.rename(columns={bx_col: "x", by_col: "y", bz_col: "z"})
 
         bx, by, bz = "x", "y", "z"
         return df, inner_name, bx, by, bz
@@ -140,7 +180,7 @@ def plot_magnetometer(path, station, date, lat, lon, grid, nick, instrument_id):
         try:
             df["ts"] = pd.to_datetime(df["ts"], format="%Y-%m-%dT%H:%M:%SZ")
             parse_success = True
-            writeLog("Successfully parsed timestamps with format '%d %b %Y %H:%M:%S'")
+            writeLog("Successfully parsed timestamps with format '%Y-%m-%dT%H:%M:%SZ'")
         except Exception as e:
             writeLog(f"First parse attempt failed: {str(e)}")
             try:
