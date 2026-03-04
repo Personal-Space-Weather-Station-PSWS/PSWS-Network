@@ -112,7 +112,7 @@ maidenheadGrid= 'EN91' # Default grid
 # Plot creation
 fig, axs= plt.subplots()
 
-metadata_dir= dataDir + '//ch0//metadata'
+metadata_dir= dataDir + '/ch0/metadata'
 print("Looking for metadata at: ", metadata_dir)
 
 # DRF reader creation
