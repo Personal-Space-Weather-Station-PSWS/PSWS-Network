@@ -12,7 +12,7 @@ from rest_framework.throttling import AnonRateThrottle
 from rest_framework import status
 from django.http import FileResponse
 from datetime import datetime, timezone, timedelta
-import tempfile, os, re, zipfile, mimetypes
+import tempfile, os, re, zipfile, mimetypes, functools
 
 from apps.stations.models import Station
 from apps.observations.models import Observation
@@ -55,21 +55,18 @@ def _safe_observation_path(obs):
         # dirs BEFORE making any filesystem calls to avoid timing-based
         # information leakage about paths outside ALLOWED_BASE_DIRS.
         resolved_dir = os.path.realpath(obs.path)
-        if (
-            _validate_within_allowed_dirs(resolved_dir)
-            and os.path.isdir(resolved_dir)
-            and os.path.basename(resolved_dir) == obs.fileName
-        ):
-            return resolved_dir, True
-        if (
-            not _validate_within_allowed_dirs(resolved_dir)
-            and os.path.basename(resolved_dir) == obs.fileName
-        ):
+        allowed = _validate_within_allowed_dirs(resolved_dir)
+        is_basename_match = os.path.basename(resolved_dir) == obs.fileName
+        # If the directory is outside allowed dirs but otherwise looks valid,
+        # log and fail before touching the filesystem.
+        if not allowed and is_basename_match:
             writeLog(
                 f"PATH VALIDATION FAILED (directory) for observation {obs.id}: "
                 f"{resolved_dir} is outside allowed directories"
             )
             return None, False
+        if allowed and is_basename_match and os.path.isdir(resolved_dir):
+            return resolved_dir, True
 
         # magData / csvData: path is the parent directory, fileName is
         # the actual file.  Construct: <obs.path>/<obs.fileName>
@@ -90,8 +87,7 @@ def _safe_observation_path(obs):
 def writeLog(theMessage):
     timestamp = datetime.now(timezone.utc).isoformat()[0:19]
     try:
-        #with open("/srv/PSWS-Network/logs/observations_api.log", "a") as f:
-        with open("/home/developer/logs/psws_watchdog.log", "a") as f:
+        with open("/srv/PSWS-Network/logs/observations_api.log", "a") as f:
             f.write(timestamp + " " + theMessage + "\n")
     except OSError:
         # If the log file can't be written (permissions, disk full, etc.),
@@ -584,6 +580,13 @@ class ObservationDownloadAPIView(APIView):
                                 as_attachment=True,
                                 filename=zip_filename,
                                 content_type="application/zip")
+            # Schedule temp file deletion after Django finishes streaming
+            # the response.  FileResponse.close() calls every registered
+            # resource closer in order; the file handle's .close() was
+            # already registered by Django, so os.unlink runs afterwards.
+            response._resource_closers.append(
+                functools.partial(os.unlink, zip_path)
+            )
             
             # Add custom headers visible to user
             response['X-Files-Discovered'] = str(len(observations))
@@ -637,6 +640,10 @@ class ObservationDownloadAPIView(APIView):
                                     as_attachment=True,
                                     filename=download_name,
                                     content_type="application/zip")
+                # Schedule temp file deletion after streaming completes.
+                response._resource_closers.append(
+                    functools.partial(os.unlink, zip_tmp)
+                )
                 response['X-Files-Discovered'] = '1'
                 response['X-Files-Processed'] = '1'
                 response['X-Files-Added'] = '1'
