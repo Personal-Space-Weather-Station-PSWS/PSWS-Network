@@ -11,8 +11,8 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework import status
 from django.http import FileResponse
-from datetime import datetime, timezone
-import tempfile, os, re, zipfile
+from datetime import datetime, timezone, timedelta
+import tempfile, os, re, zipfile, mimetypes, functools
 
 from apps.stations.models import Station
 from apps.observations.models import Observation
@@ -22,29 +22,138 @@ ALLOWED_BASE_DIRS = [
     '/home',
 ]
 
+
+def _validate_within_allowed_dirs(resolved_path):
+    """Return True if *resolved_path* is inside one of ALLOWED_BASE_DIRS."""
+    return any(
+        resolved_path.startswith(os.path.realpath(base) + os.sep)
+        for base in ALLOWED_BASE_DIRS
+    )
+
+
 def _safe_observation_path(obs):
     """
-    Construct and validate a file path from an observation record.
-    Returns the resolved path if it is within an allowed base directory,
-    or None if the path is invalid or attempts directory traversal.
+    Construct and validate a filesystem path from an observation record.
+
+    Observation storage varies by data type:
+
+      magData / csvData – obs.path is the directory that contains
+      the file and obs.fileName is the actual file name.
+      Disk location: <obs.path>/<obs.fileName>
+
+    * spectrum (DRF) – obs.path is the observation directory
+      (e.g. /home/S000028/OBS2024-01-01T00-00) and obs.fileName
+      equals the directory's basename.  The observation is the whole
+      directory tree, not a single file.
+
+    Returns a (resolved_path, is_directory) tuple when the path is
+    valid and within ALLOWED_BASE_DIRS, or (None, False) on failure.
     """
     try:
-        raw_path = '/'.join(obs.path.split('/')[:-1]) + '/' + obs.fileName
+        # Spectrum / DRF observations: path IS the directory, fileName
+        # matches the directory name.  Validate the path is within allowed
+        # dirs BEFORE making any filesystem calls to avoid timing-based
+        # information leakage about paths outside ALLOWED_BASE_DIRS.
+        resolved_dir = os.path.realpath(obs.path)
+        allowed = _validate_within_allowed_dirs(resolved_dir)
+        is_basename_match = os.path.basename(resolved_dir) == obs.fileName
+        # If the directory is outside allowed dirs but otherwise looks valid,
+        # log and fail before touching the filesystem.
+        if not allowed and is_basename_match:
+            writeLog(
+                f"PATH VALIDATION FAILED (directory) for observation {obs.id}: "
+                f"{resolved_dir} is outside allowed directories"
+            )
+            return None, False
+        if allowed and is_basename_match and os.path.isdir(resolved_dir):
+            return resolved_dir, True
+
+        # magData / csvData: path is the parent directory, fileName is
+        # the actual file.  Construct: <obs.path>/<obs.fileName>
+        raw_path = os.path.join(obs.path, obs.fileName)
         resolved = os.path.realpath(raw_path)
-        if any(resolved.startswith(os.path.realpath(base) + os.sep) for base in ALLOWED_BASE_DIRS):
-            return resolved
+        if _validate_within_allowed_dirs(resolved):
+            return resolved, False
+
     except (TypeError, AttributeError):
         pass
-    writeLog(f"PATH VALIDATION FAILED for observation {obs.id}: attempted path outside allowed directories")
-    return None
+
+    writeLog(
+        f"PATH VALIDATION FAILED for observation {obs.id}: "
+        f"attempted path outside allowed directories"
+    )
+    return None, False
 
 def writeLog(theMessage):
     timestamp = datetime.now(timezone.utc).isoformat()[0:19]
-    #log_dir = '/var/log/api'
-    #os.makedirs(log_dir, exist_ok=True)
-    f = open("/srv/PSWS-Network/logs/observations_api.log", "a")
-    f.write(timestamp + " " + theMessage + "\n")
-    f.close()
+    try:
+        with open("/srv/PSWS-Network/logs/observations_api.log", "a") as f:
+            f.write(timestamp + " " + theMessage + "\n")
+    except OSError:
+        # If the log file can't be written (permissions, disk full, etc.),
+        # silently continue rather than crashing the API request.
+        pass
+
+
+def _dir_size(path):
+    """Return the total size in bytes of all files under path (recursive).
+
+    Symlinks are not followed to prevent traversal outside the observation
+    directory.  Files that become inaccessible between os.walk() and
+    os.path.getsize() are skipped with a log warning.
+    """
+    total = 0
+    for dirpath, _dirnames, filenames in os.walk(path, followlinks=False):
+        for fname in filenames:
+            fp = os.path.join(dirpath, fname)
+            if os.path.isfile(fp):
+                try:
+                    total += os.path.getsize(fp)
+                except OSError as e:
+                    writeLog(f"_dir_size: failed to get size for '{fp}': {e}")
+    return total
+
+
+def _add_directory_to_zip(zipf, dir_path, arc_prefix):
+    """
+    Recursively add every file inside dir_path to the open ZipFile
+    zipf, storing them under arc_prefix/ inside the archive.
+    Returns the number of files successfully added.
+
+    Symlinks are not followed to prevent traversal outside the observation
+    directory.  Individual file errors (permissions, file removed mid-walk)
+    are logged and skipped rather than aborting the whole archive.
+    """
+    count = 0
+    for dirpath, _dirnames, filenames in os.walk(dir_path, followlinks=False):
+        for fname in filenames:
+            full = os.path.join(dirpath, fname)
+            arcname = os.path.join(arc_prefix, os.path.relpath(full, dir_path))
+            try:
+                zipf.write(full, arcname=arcname)
+                count += 1
+            except Exception as exc:
+                try:
+                    writeLog(f"ZIP write error for '{full}' as '{arcname}': {exc}")
+                except Exception:
+                    pass
+    return count
+
+
+def _zip_directory_to_tempfile(dir_path, arc_prefix):
+    """
+    Create a temporary ZIP of the directory at dir_path.
+    Returns the path to the temporary ZIP file.
+    The caller is responsible for cleaning up the temp file.
+    """
+    tmpf = tempfile.NamedTemporaryFile(
+        prefix="obs_dir_", suffix=".zip", delete=False
+    )
+    zip_path = tmpf.name
+    tmpf.close()
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        _add_directory_to_zip(zipf, dir_path, arc_prefix)
+    return zip_path
 
 class ObservationDownloadAPIView(APIView):
     throttle_classes = [AnonRateThrottle]
@@ -151,11 +260,15 @@ class ObservationDownloadAPIView(APIView):
             return Response({"detail": "End date must be after start date"}, status=status.HTTP_400_BAD_REQUEST)
 
         # INITIAL QUERY: Filter observations by date range
-        # This filters on the observation's start and end dates
-        writeLog(f"Querying observations between {start_dt.date()} and {end_dt.date()}")
+        # The user supplies calendar dates (YYYY-MM-DD) which parse to midnight
+        # (00:00:00).  Observation endDate values are typically set to end-of-day
+        # (e.g. 23:59).  Push end_dt to the very end of the requested day so
+        # that "start_date=2024-01-01&end_date=2024-01-01" captures the full day.
+        end_dt_inclusive = end_dt + timedelta(days=1, microseconds=-1)
+        writeLog(f"Querying observations between {start_dt} and {end_dt_inclusive}")
         observations_in_range = Observation.objects.filter(
             startDate__gte=start_dt,
-            endDate__lte=end_dt
+            endDate__lte=end_dt_inclusive
         )
         writeLog(f"Initial date range query returned {observations_in_range.count()} observations")
 
@@ -163,7 +276,7 @@ class ObservationDownloadAPIView(APIView):
         # This prevents conflicting filter criteria that could lead to unexpected results
         if station_id and (lat_min or lat_max or lon_min or lon_max):
             writeLog("VALIDATION FAILED: Both station_id and lat/lon parameters provided")
-            return Response({"detail": "Invalid parameters: must choose either station_id or latitude and longitude range"})
+            return Response({"detail": "Invalid parameters: must choose either station_id or latitude and longitude range"}, status=status.HTTP_400_BAD_REQUEST)
 
         # STATION FILTERING: Filter by specific station ID (case-insensitive)
         # Example test case: station_id="S000028" should match station with ID "s000028" or "S000028"
@@ -303,13 +416,24 @@ class ObservationDownloadAPIView(APIView):
                     print(log_msg)
                 else:
                     # Construct file path to check on disk (with path traversal protection)
-                    file_path = _safe_observation_path(obs)
+                    file_path, is_dir = _safe_observation_path(obs)
                     if file_path is None:
                         log_msg = f"  {obs.fileName}: Path validation failed, skipping from size calculation"
                         writeLog(log_msg)
                         print(log_msg)
                         continue
-                    if os.path.exists(file_path):
+                    if is_dir:
+                        if os.path.isdir(file_path):
+                            file_size = _dir_size(file_path)
+                            log_msg = f"  {obs.fileName}: {file_size / (1024*1024):.2f} MB (directory, from disk)"
+                            writeLog(log_msg)
+                            print(log_msg)
+                        else:
+                            log_msg = f"  {obs.fileName}: Directory not found at {file_path}, skipping from size calculation"
+                            writeLog(log_msg)
+                            print(log_msg)
+                            continue
+                    elif os.path.exists(file_path):
                         file_size = os.path.getsize(file_path)
                         log_msg = f"  {obs.fileName}: {file_size / (1024*1024):.2f} MB (from disk)"
                         writeLog(log_msg)
@@ -352,7 +476,10 @@ class ObservationDownloadAPIView(APIView):
                 zip_filename = f"observations_{safe_station}_{safe_start}_{safe_end}.zip"
             else:
                 zip_filename = f"observations_region_{safe_start}_{safe_end}.zip"
-            zip_path = os.path.join(temp_dir, zip_filename)
+            # Create a unique temp file for the zip to avoid permission/overwrite issues
+            tmpf = tempfile.NamedTemporaryFile(prefix="observations_", suffix=".zip", dir=temp_dir, delete=False)
+            zip_path = tmpf.name
+            tmpf.close()
             log_msg = f"Creating ZIP archive: {zip_path}"
             writeLog(log_msg)
             print(log_msg)
@@ -368,12 +495,8 @@ class ObservationDownloadAPIView(APIView):
                         writeLog(log_msg)
                         print(log_msg)
                         
-                        # VALIDATION: Only process ZIP files within date range # Removed since some files may not be .zip?
-                        #file_extension = obs.fileName[-4:]
-                        #if file_extension == '.zip':
-                            
                         # CONSTRUCT FILE PATH: Build full path to observation file (with path traversal protection)
-                        file_path = _safe_observation_path(obs)
+                        file_path, is_dir = _safe_observation_path(obs)
                         if file_path is None:
                             log_msg = f"  ✗ Path validation failed for {obs.fileName}"
                             writeLog(log_msg)
@@ -381,28 +504,47 @@ class ObservationDownloadAPIView(APIView):
                             continue
                         # TEST CASE - developer is linux username
                         #file_path = "/home/developer/S000028/magData/" + obs.fileName
-                        log_msg = f"  File path: {file_path}"
+                        log_msg = f"  File path: {file_path} ({'directory' if is_dir else 'file'})"
                         writeLog(log_msg)
                         print(log_msg)
-                            
-                        # VALIDATION: Check file exists before adding to ZIP
-                        if os.path.exists(file_path):
-                            try:
-                                zipf.write(file_path, arcname=obs.fileName)
-                                files_added += 1
-                                log_msg = f"  ✓ Successfully added to ZIP"
-                                writeLog(log_msg)
-                                print(log_msg)
-                            except Exception as add_error:
-                                log_msg = f"  ✗ Error adding file to ZIP: {add_error}"
+
+                        if is_dir:
+                            # Spectrum / DRF observation: zip directory contents into archive
+                            if os.path.isdir(file_path):
+                                try:
+                                    added = _add_directory_to_zip(zipf, file_path, obs.fileName)
+                                    files_added += added
+                                    log_msg = f"  ✓ Added directory ({added} files inside) to ZIP as {obs.fileName}/"
+                                    writeLog(log_msg)
+                                    print(log_msg)
+                                except Exception as add_error:
+                                    log_msg = f"  ✗ Error adding directory to ZIP: {add_error}"
+                                    writeLog(log_msg)
+                                    print(log_msg)
+                            else:
+                                log_msg = f"  ✗ Directory not found at path"
                                 writeLog(log_msg)
                                 print(log_msg)
                         else:
-                            log_msg = f"  ✗ File not found at path"
-                            writeLog(log_msg)
-                            print(log_msg)
-                        #else:
-                        #    print(f"  ✗ File skipped (invalid extension or date range)")
+                            # Regular file (magData zip, csvData, etc.)
+                            if os.path.exists(file_path):
+                                # Try opening the file first to surface permission errors early
+                                try:
+                                    with open(file_path, 'rb') as ftest:
+                                        # If open succeeds, add to zip
+                                        zipf.write(file_path, arcname=obs.fileName)
+                                        files_added += 1
+                                        log_msg = f"  ✓ Successfully added to ZIP"
+                                        writeLog(log_msg)
+                                        print(log_msg)
+                                except Exception as add_error:
+                                    log_msg = f"  ✗ Error adding file to ZIP: {add_error}"
+                                    writeLog(log_msg)
+                                    print(log_msg)
+                            else:
+                                log_msg = f"  ✗ File not found at path"
+                                writeLog(log_msg)
+                                print(log_msg)
                             
             except Exception as e:
                 log_msg = f"CRITICAL ERROR creating ZIP file: {str(e)}"
@@ -417,16 +559,34 @@ class ObservationDownloadAPIView(APIView):
             
             # Check if any files were actually added
             if files_added == 0:
-                writeLog("NO FILES ADDED to ZIP archive - all files missing from filesystem")
+                writeLog("NO FILES ADDED to ZIP archive - all files missing from filesystem or unreadable")
+                # Clean up the temp zip file if created
+                try:
+                    if os.path.exists(zip_path):
+                        os.remove(zip_path)
+                except Exception:
+                    pass
                 return Response({"detail": "No valid observation files found to include in archive"},
                                 status=status.HTTP_404_NOT_FOUND)
 
             # RETURN ZIP FILE: Send ZIP archive as download with custom headers
             writeLog(f"Successfully returning ZIP archive with {files_added} files")
-            response = FileResponse(open(zip_path, 'rb'),
+            try:
+                zip_handle = open(zip_path, 'rb')
+            except Exception as open_zip_err:
+                writeLog(f"ERROR: Unable to open generated zip for reading: {open_zip_err}")
+                return Response({"detail": "Failed to read generated zip file"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            response = FileResponse(zip_handle,
                                 as_attachment=True,
                                 filename=zip_filename,
                                 content_type="application/zip")
+            # Schedule temp file deletion after Django finishes streaming
+            # the response.  FileResponse.close() calls every registered
+            # resource closer in order; the file handle's .close() was
+            # already registered by Django, so os.unlink runs afterwards.
+            response._resource_closers.append(
+                functools.partial(os.unlink, zip_path)
+            )
             
             # Add custom headers visible to user
             response['X-Files-Discovered'] = str(len(observations))
@@ -442,37 +602,78 @@ class ObservationDownloadAPIView(APIView):
         else:
             writeLog("Single file response - processing")
             obs = observations[0]
-            #file_extension = obs.fileName[-4:]
-            
-            # VALIDATION: Check file is within date range and is a ZIP file # Removed since some files may not be .zip?
-            #if not file_extension == '.zip':
-            #    return Response({"detail": "Observation file not found or invalid."},
-            #                    status=status.HTTP_404_NOT_FOUND)
             
             # CONSTRUCT FILE PATH: Build full path to observation file (with path traversal protection)
-            file_path = _safe_observation_path(obs)
+            file_path, is_dir = _safe_observation_path(obs)
             if file_path is None:
                 writeLog(f"PATH VALIDATION FAILED for single file: {obs.fileName}")
                 return Response({"detail": "Observation file path is invalid."},
                                 status=status.HTTP_400_BAD_REQUEST)
             # TEST CASE - developer is linux username
             #file_path = "/home/developer/S000028/magData/" + obs.fileName
-            log_msg = f"Serving single file: {file_path}"
+            log_msg = f"Serving single observation: {file_path} ({'directory' if is_dir else 'file'})"
             writeLog(log_msg)
             print(log_msg)
-            
-            # VALIDATION: Verify file exists on filesystem
+
+            if is_dir:
+                # Spectrum / DRF observation directory — zip on-the-fly and return
+                if not os.path.isdir(file_path):
+                    writeLog(f"DIRECTORY NOT FOUND on filesystem: {file_path}")
+                    return Response({"detail": "Observation directory not found on filesystem."},
+                                    status=status.HTTP_404_NOT_FOUND)
+                try:
+                    zip_tmp = _zip_directory_to_tempfile(file_path, obs.fileName)
+                except Exception as zip_err:
+                    writeLog(f"ERROR: Failed to zip observation directory: {zip_err}")
+                    return Response({"detail": "Failed to create zip from observation directory."},
+                                    status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+                download_name = obs.fileName + ".zip"
+                writeLog(f"Successfully zipped directory, returning as {download_name}")
+                try:
+                    zip_handle = open(zip_tmp, 'rb')
+                except Exception as fh_err:
+                    writeLog(f"ERROR: Unable to open zipped directory for reading: {fh_err}")
+                    return Response({"detail": "Permission denied reading generated zip."},
+                                    status=status.HTTP_403_FORBIDDEN)
+                response = FileResponse(zip_handle,
+                                    as_attachment=True,
+                                    filename=download_name,
+                                    content_type="application/zip")
+                # Schedule temp file deletion after streaming completes.
+                response._resource_closers.append(
+                    functools.partial(os.unlink, zip_tmp)
+                )
+                response['X-Files-Discovered'] = '1'
+                response['X-Files-Processed'] = '1'
+                response['X-Files-Added'] = '1'
+                response['X-Archive-Type'] = 'single-directory-zipped'
+
+                writeLog("Request completed successfully - directory zipped and sent")
+                writeLog("="*80)
+                return response
+
+            # Regular file (magData zip, csvData, etc.)
             if not os.path.exists(file_path):
                 writeLog(f"FILE NOT FOUND on filesystem: {file_path}")
                 return Response({"detail": "Observation file not found on filesystem."},
                                 status=status.HTTP_404_NOT_FOUND)
             
             # RETURN SINGLE FILE: Send observation file as download with custom headers
+            try:
+                file_handle = open(file_path, 'rb')
+            except Exception as fh_err:
+                writeLog(f"ERROR: Unable to open observation file for reading: {fh_err}")
+                return Response({"detail": "Permission denied reading the observation file."}, status=status.HTTP_403_FORBIDDEN)
+
             writeLog(f"Successfully returning single file: {obs.fileName}")
-            response = FileResponse(open(file_path, 'rb'),
+            mime_type, _ = mimetypes.guess_type(obs.fileName)
+            if not mime_type:
+                mime_type = "application/octet-stream"
+            response = FileResponse(file_handle,
                                 as_attachment=True,
                                 filename=obs.fileName,
-                                content_type="application/zip")
+                                content_type=mime_type)
             
             # Add custom headers visible to user
             response['X-Files-Discovered'] = '1'

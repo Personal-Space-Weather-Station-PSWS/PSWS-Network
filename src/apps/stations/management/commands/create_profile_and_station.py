@@ -18,6 +18,7 @@ from django.utils import timezone
 import os
 import secrets
 import string
+import subprocess
 import maidenhead as mh
 from pathlib import Path
 
@@ -144,9 +145,26 @@ class Command(BaseCommand):
 		REPO_ROOT = Path(__file__).resolve().parents[5]
 		STATION_CREATION_SCRIPT = str(REPO_ROOT / "scripts/ingest/stationcreation4.sh")
 
-		# Run directory creation command
-		os.system(f'sudo {STATION_CREATION_SCRIPT} {station.station_id} {station.station_pass}')
-		self.stdout.write(self.style.SUCCESS(f"Directory created for station {station.station_id}"))
+		# Run directory creation command (subprocess prevents shell injection)
+		try:
+			result = subprocess.run(
+				['sudo', STATION_CREATION_SCRIPT, station.station_id, station.station_pass],
+				capture_output=True,
+				text=True,
+				timeout=30,
+				check=True
+			)
+			self.stdout.write(self.style.SUCCESS(f"Directory created for station {station.station_id}"))
+			if result.stdout:
+				self.stdout.write(result.stdout)
+		except subprocess.CalledProcessError as e:
+			self.stdout.write(self.style.ERROR(f"Failed to create directory: {e.stderr}"))
+			station.delete()  # Clean up the station if directory creation fails
+			return
+		except subprocess.TimeoutExpired:
+			self.stdout.write(self.style.ERROR("Station creation script timed out"))
+			station.delete()  # Clean up the station if script times out
+			return
 		
 		# # No longer need jailing as of 2026
 		# create_jail_script = "/bin/create_jail.sh"

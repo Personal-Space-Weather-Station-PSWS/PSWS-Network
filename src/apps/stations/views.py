@@ -17,6 +17,7 @@ from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
 from django_tables2 import SingleTableView
 from django.conf import settings
+from django.db import transaction
 
 import maidenhead as mh
 from .tables import StationTable, FilteredStationTable, StationUserTable, StationInstrumentTable
@@ -29,6 +30,7 @@ from apps.instruments.tables import InstrumentTable
 from apps.observations.models import Observation
 
 import os, sys
+import subprocess
 import logging
 logger = logging.getLogger(__name__)
 
@@ -137,9 +139,22 @@ def add_station_view(request):
             station.postal_code = form.cleaned_data.get('postal_code')
             station.phone_number = form.cleaned_data.get('phone_number')
             station.create_date = datetime.now()
-            station.save()
-            os.system('sudo ' + str(settings.BASE_DIR) + '/scripts/ingest/stationcreation4.sh ' + station.station_id + ' ' + station.station_pass)
-            return redirect('stations')
+            try:
+                with transaction.atomic(): # atomic database transaction to avoid race condition on station_id and ensure cleanup if script fails
+                    station.save()
+                    station_creation_script = str(settings.BASE_DIR) + '/scripts/ingest/stationcreation4.sh'
+                    subprocess.run(
+                        ['sudo', station_creation_script, station.station_id, station.station_pass],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                        check=True
+                    )
+                    return redirect('stations')
+            except Exception as e:
+                messages.error(request, "An unexpected error occurred. Please try again.")
+                logger.error(f"Error during station creation: {e}")
+                return render(request, 'add_station.html', {'form': form})
     else:
         form = StationCreationForm()
 
@@ -160,14 +175,6 @@ def update_station_view(request, id=None):
             return render(request, 'station_update.html', {'form': form, 'station': station})
           station.delete()
           return redirect('my_stations_list')
-
-        if request.POST.get("del-button"):
-            instrQS = Instrument.objects.filter(station_id=station.id)
-            if instrQS.count() > 0:   # this station has instrument(s), deny the deletion
-                messages.error(request, "(!) YOU CAN ONLY DELETE THIS STATION AFTER DELETING ITS INSTRUMENT(S).")
-                return render(request, 'station_update.html', {'form': form, 'station': station})
-            station.delete()
-            return redirect('my_stations_list')
 
         if form.is_valid():
             station.nickname = form.cleaned_data.get('nickname')
