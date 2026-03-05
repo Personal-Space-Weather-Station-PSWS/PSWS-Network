@@ -513,7 +513,7 @@ class ObservationDownloadAPIView(APIView):
                             if os.path.isdir(file_path):
                                 try:
                                     added = _add_directory_to_zip(zipf, file_path, obs.fileName)
-                                    files_added += 1
+                                    files_added += added
                                     log_msg = f"  ✓ Added directory ({added} files inside) to ZIP as {obs.fileName}/"
                                     writeLog(log_msg)
                                     print(log_msg)
