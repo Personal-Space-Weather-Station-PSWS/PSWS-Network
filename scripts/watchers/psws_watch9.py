@@ -18,8 +18,29 @@ from datetime import datetime as dt
 
 import os, sys, time
 from pathlib import Path
+from dotenv import load_dotenv
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers.polling import PollingObserver  # <- polling, not inotify
+
+# Load environment variables from scripts.env
+env_path = Path(__file__).resolve().parent.parent / "scripts.env"
+load_dotenv(dotenv_path=env_path)
+
+# Get environment variables
+LOG_PATH = os.getenv("LOG_PATH")
+PYTHON_EXECUTABLE = os.getenv("PYTHON_EXECUTABLE", sys.executable)
+BASE_PATH_PLOTTERS = os.getenv("BASE_PATH_PLOTTERS")
+BASE_PATH_INGEST = os.getenv("BASE_PATH_INGEST")
+
+# Validate required environment variables
+if not LOG_PATH:
+    raise EnvironmentError("LOG_PATH not set in scripts.env")
+if not PYTHON_EXECUTABLE:
+    raise EnvironmentError("PYTHON_EXECUTABLE not set in scripts.env")
+if not BASE_PATH_PLOTTERS:
+    raise EnvironmentError("BASE_PATH_PLOTTERS not set in scripts.env")
+if not BASE_PATH_INGEST:
+    raise EnvironmentError("BASE_PATH_INGEST not set in scripts.env")
 
 ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else "/home")
 
@@ -41,7 +62,7 @@ def writeLog(msg):
 def writeLog(theMessage):
     print("log:", theMessage)
     timestamp = dt.now(timezone.utc).isoformat()[0:19]
-    f = open("/var/log/watchdog/watchdog.log", "a")
+    f = open(LOG_PATH, "a")
     f.write(timestamp + " " + theMessage + "\n")
     f.close()
 
@@ -152,7 +173,10 @@ class TriggerDirHandler(FileSystemEventHandler):
                     writeLog("trigger=" + trigger)
                     # for calling addCSV, arguments are: (1) path, (2) station_id, (3) instrument, (4) trigger
                     cmd = (
-                        "/opt/venv311/bin/python3 /var/www/html/psws_addCSV.py "
+                        PYTHON_EXECUTABLE
+                        + " "
+                        + os.path.join(BASE_PATH_INGEST, "psws_addCSV.py")
+                        + " "
                         + path
                         + " "
                         + stationID
@@ -284,7 +308,10 @@ class TriggerDirHandler(FileSystemEventHandler):
                     subprocess.run(args)
 
                     command = (
-                        "/opt/venv311/bin/python psws_addOBS.py "
+                        PYTHON_EXECUTABLE
+                        + " "
+                        + os.path.join(BASE_PATH_INGEST, "psws_addOBS.py")
+                        + " "
                         + str(dataRate)
                         + " "
                         + str(obsSize)
@@ -324,7 +351,11 @@ class TriggerDirHandler(FileSystemEventHandler):
                         writeLog("Trigger graphing  program")
                         # This uses task spooler (ts) to make multiple plot jobs run in a queue
                         graph_command = (
-                            "ts /srv/PSWS-Network/venv312/bin/python3 /srv/PSWS-Network/scripts/plotters/plotspectrum.py -e "
+                            "ts "
+                            + PYTHON_EXECUTABLE
+                            + " "
+                            + os.path.join(BASE_PATH_PLOTTERS, "plotspectrum_v8.py")
+                            + " -e "
                             + event.src_path
                         )  # plot path will be set in plotspectrum
                         writeLog("Running graph_command ----> " + graph_command)
@@ -358,7 +389,10 @@ class TriggerDirHandler(FileSystemEventHandler):
                     # Make sure to use the correct virtual environment here; needs to match
                     #  what is in /etc/systemd/system/watchX.service
                     command = (
-                        "/srv/PSWS-Network/venv312/bin/python3 /srv/PSWS-Network/scripts/ingest/psws_addMAG.py "
+                        PYTHON_EXECUTABLE
+                        + " "
+                        + os.path.join(BASE_PATH_INGEST, "psws_addMAG.py")
+                        + " "
                         + path
                         + " "
                         + station_id
@@ -420,7 +454,11 @@ class TriggerDirHandler(FileSystemEventHandler):
 
                                 # This uses task spooler (ts) to make multiple plot jobs run in a queue
                                 graph_command = (
-                                    "ts /srv/PSWS-Network/venv312/bin/python3 /srv/PSWS-Network/scripts/plotters/plotmag.py "
+                                    "ts "
+                                    + PYTHON_EXECUTABLE
+                                    + " "
+                                    + os.path.join(BASE_PATH_PLOTTERS, "plotmag.py")
+                                    + " "
                                     + fpath
                                     + " --station "
                                     + station_id
