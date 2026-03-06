@@ -475,7 +475,16 @@ class TriggerDirHandler(FileSystemEventHandler):
                                     + '" -i '
                                     + instrumentNo
                                 )
-                                writeLog("Running graph_command ----> " + graph_command)
+                                # Avoid logging sensitive location data (latitude/longitude) in clear text
+                                writeLog(
+                                    "Running graph_command for file "
+                                    + fpath
+                                    + " and station "
+                                    + station_id
+                                    + " on "
+                                    + date_str
+                                    + " (location details redacted)"
+                                )
                                 os.system(graph_command)
                             writeLog("Magnetometer graphing commands run!")
                     except Exception as ex:
