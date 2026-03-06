@@ -69,29 +69,30 @@ def open_maybe_zip(path):
 
 
 def load_dataframe(path):
-    def _looks_like_timestamp(value):
-        if pd.isna(value):
-            return False
-        candidate = str(value).strip().strip('"')
-        if not candidate:
-            return False
-        try:
-            pd.to_datetime(candidate)
-            return True
-        except Exception:
-            return False
+    """
+    Load magnetometer data from a file.
 
+    Supports three file formats:
+    - Type 1 (JSON Lines): {"ts":"...", "x":..., "y":..., "z":..., ...}
+    - Type 2 (9-column CSV): ts, temp, x, y, z, rx, ry, rz, Tm
+    - Type 3 (10-column CSV): ts, temp1, temp2, x, y, z, rx, ry, rz, Tm
+
+    Returns:
+        tuple: (dataframe, inner_name, bx_col, by_col, bz_col)
+    """
     f, inner_name = open_maybe_zip(path)
 
     try:
         first = f.read(1)
         f.seek(0)
 
+        # Type 1: JSON Lines format
         if first == b"{":
             df = pd.read_json(f, lines=True)
             bx, by, bz = "x", "y", "z"
             return df, inner_name, bx, by, bz
 
+        # CSV formats (Type 2 and Type 3)
         df = pd.read_csv(
             f,
             header=None,
@@ -106,33 +107,28 @@ def load_dataframe(path):
             raise ValueError("CSV file contains no data")
 
         df = df.dropna(how="all").dropna(axis=1, how="all")
-
-        header_present = False
-        while len(df) > 0 and not _looks_like_timestamp(df.iloc[0, 0]):
-            header_present = True
-            df = df.iloc[1:]
+        df = df.reset_index(drop=True)
 
         if df.empty:
-            raise ValueError("No timestamped rows found in CSV file")
+            raise ValueError("No data rows found in CSV file")
 
-        df = df.reset_index(drop=True)
-        df.columns = [f"col{i}" for i in range(df.shape[1])]
-        df = df.rename(columns={"col0": "ts"})
-        df["ts"] = df["ts"].astype(str).str.strip().str.strip('"')
+        num_cols = df.shape[1]
 
-        fallback_indices = (3, 4, 5) if header_present else (2, 3, 4)
-        col_names = list(df.columns)
-
-        try:
-            bx_col = col_names[fallback_indices[0]]
-            by_col = col_names[fallback_indices[1]]
-            bz_col = col_names[fallback_indices[2]]
-        except IndexError:
+        if num_cols == 9:
+            # Type 2: 9-column CSV format
+            # Columns: ts(0), temp(1), x(2), y(3), z(4), rx(5), ry(6), rz(7), Tm(8)
+            df.columns = ["ts", "temp", "x", "y", "z", "rx", "ry", "rz", "Tm"]
+        elif num_cols == 10:
+            # Type 3: 10-column CSV format
+            # Columns: ts(0), temp1(1), temp2(2), x(3), y(4), z(5), rx(6), ry(7), rz(8), Tm(9)
+            df.columns = ["ts", "temp1", "temp2", "x", "y", "z", "rx", "ry", "rz", "Tm"]
+        else:
             raise ValueError(
-                "CSV file does not contain enough columns for magnetometer data"
-            ) from None
+                f"Unsupported CSV format: expected 9 or 10 columns, got {num_cols}"
+            )
 
-        df = df.rename(columns={bx_col: "x", by_col: "y", bz_col: "z"})
+        # Clean up timestamp column
+        df["ts"] = df["ts"].astype(str).str.strip().str.strip('"')
 
         bx, by, bz = "x", "y", "z"
         return df, inner_name, bx, by, bz
@@ -340,7 +336,7 @@ if __name__ == "__main__":
         args.station,
         args.date,
         args.lat,
-        args.long,
+        getattr(args, "long"),
         args.grid,
         args.nick,
         args.instrument,
