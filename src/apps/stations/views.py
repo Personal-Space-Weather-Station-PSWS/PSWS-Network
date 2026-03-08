@@ -14,7 +14,7 @@ from datetime import datetime
 from apps.stations.models import Station
 from apps.stations.forms import StationCreationForm
 from django.contrib import messages
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist  # noqa: F401 – kept for other usages
 from django_tables2 import SingleTableView
 from django.conf import settings
 from django.db import transaction
@@ -113,13 +113,6 @@ def add_station_view(request):
             station = form.save(commit=False)
             station.user_id = request.user.id
             
-            # Determine new station's ID number
-            try:
-                new_id_number = Station.objects.latest('create_date').id + 1
-            except ObjectDoesNotExist:
-                new_id_number = 1
-            
-            station.station_id = 'S' + str(new_id_number).zfill(6)
             station.station_pass = station_activation_token.make_token(request.user)
             station.station_pass = station.station_pass.replace('-', station.station_pass[0])[4:36]
             station.nickname = form.cleaned_data.get('nickname')
@@ -140,20 +133,57 @@ def add_station_view(request):
             station.phone_number = form.cleaned_data.get('phone_number')
             station.create_date = datetime.now()
             try:
-                with transaction.atomic(): # atomic database transaction to avoid race condition on station_id and ensure cleanup if script fails
+                # Atomic transaction scoped to DB writes only; derive
+                # station_id from the saved pk to avoid race conditions.
+                with transaction.atomic():
                     station.save()
-                    station_creation_script = str(settings.BASE_DIR) + '/scripts/ingest/stationcreation4.sh'
-                    subprocess.run(
-                        ['sudo', station_creation_script, station.station_id, station.station_pass],
-                        capture_output=True,
-                        text=True,
-                        timeout=30,
-                        check=True
-                    )
-                    return redirect('stations')
-            except Exception as e:
+                    station.station_id = 'S' + str(station.pk).zfill(6)
+                    station.save(update_fields=['station_id'])
+
+                # Run the provisioning script outside the transaction so
+                # we don't hold DB locks during the subprocess call.
+                station_creation_script = str(settings.BASE_DIR) + '/scripts/ingest/stationcreation4.sh'
+                subprocess.run(
+                    ['sudo', station_creation_script, station.station_id, station.station_pass],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    check=True
+                )
+                return redirect('stations')
+            except subprocess.TimeoutExpired:
+                messages.error(request, "Station creation timed out. Please try again.")
+                logger.exception(
+                    "Timeout during station creation for station %s",
+                    station.station_id,
+                )
+                # Clean up the DB record since provisioning didn't complete
+                try:
+                    if station.pk:
+                        station.delete()
+                except Exception as cleanup_error:
+                    logger.error(f"Error cleaning up station after timeout: {cleanup_error}")
+                return render(request, 'add_station.html', {'form': form})
+            except subprocess.CalledProcessError:
+                messages.error(request, "Station creation failed due to an internal error. Please contact support.")
+                logger.exception(
+                    "Subprocess error during station creation for station %s",
+                    station.station_id,
+                )
+                try:
+                    if station.pk:
+                        station.delete()
+                except Exception as cleanup_error:
+                    logger.error(f"Error cleaning up station after script failure: {cleanup_error}")
+                return render(request, 'add_station.html', {'form': form})
+            except Exception:
                 messages.error(request, "An unexpected error occurred. Please try again.")
-                logger.error(f"Error during station creation: {e}")
+                logger.exception("Unexpected error during station creation.")
+                try:
+                    if station.pk:
+                        station.delete()
+                except Exception as cleanup_error:
+                    logger.error(f"Error cleaning up station after failure: {cleanup_error}")
                 return render(request, 'add_station.html', {'form': form})
     else:
         form = StationCreationForm()

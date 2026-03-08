@@ -12,7 +12,7 @@ from rest_framework.throttling import AnonRateThrottle
 from rest_framework import status
 from django.http import FileResponse
 from datetime import datetime, timezone, timedelta
-import tempfile, os, re, zipfile, mimetypes, functools
+import tempfile, os, re, zipfile, mimetypes
 
 from apps.stations.models import Station
 from apps.observations.models import Observation
@@ -576,17 +576,14 @@ class ObservationDownloadAPIView(APIView):
             except Exception as open_zip_err:
                 writeLog(f"ERROR: Unable to open generated zip for reading: {open_zip_err}")
                 return Response({"detail": "Failed to read generated zip file"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # Unlink the temp file immediately; on Linux the data remains
+            # accessible through the open file descriptor until it is
+            # closed, at which point the OS reclaims the space.
+            os.unlink(zip_path)
             response = FileResponse(zip_handle,
                                 as_attachment=True,
                                 filename=zip_filename,
                                 content_type="application/zip")
-            # Schedule temp file deletion after Django finishes streaming
-            # the response.  FileResponse.close() calls every registered
-            # resource closer in order; the file handle's .close() was
-            # already registered by Django, so os.unlink runs afterwards.
-            response._resource_closers.append(
-                functools.partial(os.unlink, zip_path)
-            )
             
             # Add custom headers visible to user
             response['X-Files-Discovered'] = str(len(observations))
@@ -636,14 +633,13 @@ class ObservationDownloadAPIView(APIView):
                     writeLog(f"ERROR: Unable to open zipped directory for reading: {fh_err}")
                     return Response({"detail": "Permission denied reading generated zip."},
                                     status=status.HTTP_403_FORBIDDEN)
+                # Unlink the temp file immediately; on Linux the data
+                # remains accessible through the open fd until close.
+                os.unlink(zip_tmp)
                 response = FileResponse(zip_handle,
                                     as_attachment=True,
                                     filename=download_name,
                                     content_type="application/zip")
-                # Schedule temp file deletion after streaming completes.
-                response._resource_closers.append(
-                    functools.partial(os.unlink, zip_tmp)
-                )
                 response['X-Files-Discovered'] = '1'
                 response['X-Files-Processed'] = '1'
                 response['X-Files-Added'] = '1'
