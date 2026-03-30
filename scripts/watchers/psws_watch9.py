@@ -50,6 +50,12 @@ def get_size(start_path): # Calculate size of directory containing observation
 
     return total_size
 
+def fix_permissions(path):
+    try:
+        subprocess.run(['chmod', '-R', '755', path], check=True)
+    except subprocess.CalledProcessError as e:
+        writeLog(f"ERROR - failed to set permissions on {path}: {e}")
+
 # These routines support the watchdog polling system
 
 def is_parent_of_interest(name: str) -> bool:
