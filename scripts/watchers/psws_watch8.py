@@ -45,6 +45,12 @@ def get_size(start_path):
 
     return total_size
 
+def fix_permissions(path):
+    try:
+        subprocess.run(['chmod', '-R', '755', path], check=True)
+    except subprocess.CalledProcessError as e:
+        writeLog(f"ERROR - failed to set permissions on {path}: {e}")
+
 class UploadEvent(PatternMatchingEventHandler):
     def __init__(self, patterns=None):
         super(UploadEvent, self).__init__(patterns=patterns)
