@@ -1,74 +1,81 @@
 {% load static %}
-<!doctype  html>
-<html  lang="en">
+<!doctype html>
+<html lang="en">
 <head>
-<link  rel="stylesheet"  href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"  integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"  crossorigin="anonymous">
+
 <title>Personal Space Weather Station Server</title>
 
+<!-- CSS -->
+<link  rel="stylesheet"  href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"  integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"  crossorigin="anonymous">
+<link  rel="stylesheet"  href="static/css/styles.css">
+
+<!-- MAPBOX -->
 <script src='https://api.mapbox.com/mapbox-gl-js/v2.1.1/mapbox-gl.js'></script>
 <link href='https://api.mapbox.com/mapbox-gl-js/v2.1.1/mapbox-gl.css' rel='stylesheet' />
-<style>
-ul {
-  list-style-type: none;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-}
 
-ul.Menu{
-  background-color: #333;
-}
+<!-- FONTS -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
 
-ul.a {list-style-type: circle;}
+<script>
+  const theme = localStorage.getItem("theme");
+  if(theme){
+    document.documentElement.setAttribute("data-theme", theme);
+  }
+</script>
 
-li {
-  float: left;
-  border-right:1px solid #bbb;
-}
-
-li:last-child {
-  border-right: none;
-}
-
-li a {
-  display: block;
-  color: white;
-  text-align: center;
-  padding: 14px 16px;
-  text-decoration: none;
-}
-
-li a:hover:not(.active) {
-  background-color: #111;
-  text-decoration: none;
-  color: white;
-}
-
-.active {
-  background-color: #04AA6D;
-}
-
-.box {
-  width: 100%;
-}
-
-img {
-  width: 100%;
-}
-
-</style> 
 </head>
 <body>
-  <div  class="container">
-    <div  class="row justify-content-center">
-     <div class="col-10">
-      <h1  class="text-center">Personal Space Weather Station</h1>
-       <h2 class="text-center">Central Control System</h2>
-      {% block main %}
-      {% endblock %}
-     </div>
+
+  <nav class="navbar">
+    <div class="nav-container">
+        <!-- Logo can go here later: <div class="logo">PSWS</div> -->
+
+        <div class="menu-toggle" onclick="toggleMenu()">☰</div>
+      {% if user.is_authenticated %}
+        <div class="nav-links" id="navLinks">
+            <a href="/home">Home</a>
+            <a href="/about/">About</a>
+            <a href="/analysis/analysis">Analysis</a>
+            <a href="/observations/observation_list">Observations</a>
+            <a href="/stations/stations">Stations</a>
+            <a href="/user_list">Users</a>
+            <a href="/signup/">Register</a>
+            <a href="{% url 'profile' %}">{{ request.user.username }}</a>
+            <form method="post" action="{% url 'logout' %}" style="display: inline;">
+              {% csrf_token %}
+              <button type="submit" style="background: none; border: none; color: white; text-align: center; padding: 14px 16px; text-decoration: none; display: block; cursor: pointer; font-family: inherit; font-size: inherit;">Log Out</button>
+            </form>
+        </div>
+      {% else %}
+        <div class="nav-links" id="navLinks">
+            <a href="/home">Home</a>
+            <a href="/about/">About</a>
+            <a href="/analysis/analysis">Analysis</a>
+            <a href="/observations/observation_list">Observations</a>
+            <a href="/stations/stations">Stations</a>
+            <a href="/user_list">Users</a>
+            <a href="/signup/">Register</a>
+            <a href="/login/">Login</a>
+        </div>
     </div>
-  </div>
+  </nav>
+
+  <section class="hero">
+    <h1>Personal Space Weather Station</h1>
+    <p>Central Control System</p>
+  </section>
+
+  {% block main %}
+  {% endblock %}
+
+  <footer class="footer">
+      <p>PSWS Network is an NSF Funded project made by the <a href="https://dcsl.cs.ua.edu/" target="_blank">University of Alabama DCSL</a>.</p>
+      <p>Toggle Dark/Light Mode <button id="theme-toggle" aria-label="Toggle Dark Mode">🌙</button></p>
+  </footer>
+
+<script src="static/js/modes.js"></script>
 </body>
 </html>
 

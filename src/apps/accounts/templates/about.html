@@ -1,35 +1,37 @@
 {% extends 'base.html' %}
 {% block main %}
 
-{% if user.is_authenticated %}
-<ul class="Menu">
-	<li><a href="/home">Home</a></li>
-	<li><a href="/stations/stations">Stations</a></li>
-	<li><a href="/observations/observation_list">Observations</a></li>
-	<li><a href="/analysis/analysis">Analysis</a></li>
-	<li><a href="/user_list">Users</a></li>
-	<li>
-		<form method="post" action="{% url 'logout' %}" style="display: inline;">
-			{% csrf_token %}
-			<button type="submit" style="background: none; border: none; color: white; text-align: center; padding: 14px 16px; text-decoration: none; display: block; cursor: pointer; font-family: inherit; font-size: inherit;">Log Out</button>
-		</form>
-	</li>
-	<li><a href="/signup/">Register your station</a></li>
-	<li><a href="{% url 'profile' %}">{{ request.user.username }}</a></li>
-	<li class="active" style="float:right"><a href="/about/">About</a></li>
-  </ul>
-{% else %}
-<ul class="Menu">
-  <li><a href="/home">Home</a></li>
-  <li><a href="/stations/stations">Stations</a></li>
-  <li><a href="/observations/observation_list">Observations</a></li>
-  <li><a href="/analysis/analysis">Analysis</a></li>
-  <li><a href="/user_list">Users</a></li>
-  <li><a href="/login/">Log In</a></li>
-  <li><a href="/signup/">Register your station</a></li>
-  <li class="active" style="float:right"><a href="/about/">About</a></li>
-</ul>
-{% endif %}
+<div>
+	{% if user.is_authenticated %}
+	<ul class="Menu">
+		<li><a class="active" href="/home">Home</a></li>
+		<li><a href="/about/">About</a></li>
+		<li><a href="/analysis/analysis">Analysis</a></li>
+		<li><a href="/observations/observation_list">Observations</a></li>
+		<li><a href="/stations/stations">Stations</a></li>
+		<li><a href="/user_list">Users</a></li>
+		<li><a href="/signup/">Register your station</a></li>
+		<li><a href="{% url 'profile' %}">{{ request.user.username }}</a></li>
+		<li style="float:right">
+			<form method="post" action="{% url 'logout' %}" style="display: inline;">
+				{% csrf_token %}
+				<button type="submit" style="background: none; border: none; color: white; text-align: center; padding: 14px 16px; text-decoration: none; display: block; cursor: pointer; font-family: inherit; font-size: inherit;">Log Out</button>
+			</form>
+		</li>
+	</ul>
+	{% else %}
+	<ul class="Menu">
+		<li><a class="active" href="/home">Home</a></li>
+		<li><a href="/about/">About</a></li>
+		<li><a href="/analysis/analysis">Analysis</a></li>
+		<li><a href="/observations/observation_list">Observations</a></li>
+		<li><a href="/stations/stations">Stations</a></li>
+		<li><a href="/user_list">Users</a></li>
+		<li><a href="/signup/">Register your station</a></li>
+		<li style="float:right"><a href="/login/">Login</a></li>
+	</ul>
+	{% endif %}
+</div>
 
 <style>
   .legend-desc {
