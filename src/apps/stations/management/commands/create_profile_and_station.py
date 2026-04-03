@@ -10,15 +10,17 @@ from django.db import models
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 
-from accounts.models import Profile
-from accounts.tables import UserTable
-from stations.models import Station
+from apps.accounts.models import Profile
+from apps.accounts.tables import UserTable
+from apps.stations.models import Station
 
 from django.utils import timezone
 import os
 import secrets
 import string
+import subprocess
 import maidenhead as mh
+from pathlib import Path
 
 '''
 EXAMPLE USAGE
@@ -140,17 +142,37 @@ class Command(BaseCommand):
 		station = Station.objects.create(**station_data)
 		self.stdout.write(self.style.SUCCESS(f"Station '{station.nickname}' created for user {username}"))
 
-		# Run directory creation command
-		os.system(f'sudo /bin/stationcreation3 {station.station_id} {station.station_pass}')
-		self.stdout.write(self.style.SUCCESS(f"Directory created for station {station.station_id}"))
-		
-		# Invoke create_jail.sh with the station ID
-		create_jail_script = "/bin/create_jail.sh"
+		REPO_ROOT = Path(__file__).resolve().parents[5]
+		STATION_CREATION_SCRIPT = str(REPO_ROOT / "scripts/ingest/stationcreation4.sh")
+
+		# Run directory creation command (subprocess prevents shell injection)
 		try:
-			os.system(f"bash {create_jail_script} {station_id}")
-			self.stdout.write(self.style.SUCCESS(f"Jail created successfully for station ID: {station_id}"))
-		except Exception as e:
-			self.stdout.write(self.style.ERROR(f"Failed to create jail for station ID: {station_id}. Error: {e}"))
+			result = subprocess.run(
+				['sudo', STATION_CREATION_SCRIPT, station.station_id, station.station_pass],
+				capture_output=True,
+				text=True,
+				timeout=30,
+				check=True
+			)
+			self.stdout.write(self.style.SUCCESS(f"Directory created for station {station.station_id}"))
+			if result.stdout:
+				self.stdout.write(result.stdout)
+		except subprocess.CalledProcessError as e:
+			self.stdout.write(self.style.ERROR(f"Failed to create directory: {e.stderr}"))
+			station.delete()  # Clean up the station if directory creation fails
+			return
+		except subprocess.TimeoutExpired:
+			self.stdout.write(self.style.ERROR("Station creation script timed out"))
+			station.delete()  # Clean up the station if script times out
+			return
+		
+		# # No longer need jailing as of 2026
+		# create_jail_script = "/bin/create_jail.sh"
+		# try:
+		# 	os.system(f"bash {create_jail_script} {station_id}")
+		# 	self.stdout.write(self.style.SUCCESS(f"Jail created successfully for station ID: {station_id}"))
+		# except Exception as e:
+		# 	self.stdout.write(self.style.ERROR(f"Failed to create jail for station ID: {station_id}. Error: {e}"))
 
 		# Prepare output file content
 		output_content = (

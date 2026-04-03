@@ -9,7 +9,6 @@
 
 # Imports needed for plotting graphs from fldigi csv files
 
-import datetime
 
 import pytz
 
@@ -23,11 +22,11 @@ import matplotlib.colors
 from   matplotlib.gridspec import GridSpec
 
 from   pytz import timezone
+from dotenv import load_dotenv
 import numpy as np
 import digital_rf as drf
 
-from   datetime import datetime, timedelta
-import datetime as dt
+from datetime import datetime, timedelta, timezone
 
 import math
 import os, tempfile
@@ -44,16 +43,27 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
+env_path = Path(__file__).resolve().parent.parent / 'scripts.env'
+load_dotenv(dotenv_path=env_path)
+
 # Django bootstrap to set up environment for Database access
 from _bootstrap_django import bootstrap 
-bootstrap() 
+bootstrap()
+
+PLOT_PATH = os.getenv("PLOT_PATH")
+LOG_PATH = os.getenv("LOG_PATH")
+
+if not PLOT_PATH:
+    raise EnvironmentError("PLOT_PATH not set in scripts.env")
+if not LOG_PATH:
+    raise EnvironmentError("LOG_PATH not set in scripts.env") 
 
 # Imports necessary modules from PSWS database
-from centerfrequencies.models 	import *
-from observations.models 	import *
-from stations.models 		import *
-from instruments.models       	import *
-from instrumenttypes.models   	import *
+from apps.centerfrequencies.models 	import *
+from apps.observations.models 	import *
+from apps.stations.models 		import *
+from apps.instruments.models       	import *
+from apps.instrumenttypes.models   	import *
 
 from decimal import Decimal
 
@@ -70,11 +80,16 @@ mpl.rcParams['axes.xmargin']     = 0
 
 print("Logging")
 def writeLog(theMessage):
-  #  timestamp = dt.datetime.now(timezone.utc).isoformat()[0:19]
-    timestamp = dt.datetime.utcnow().replace(tzinfo=pytz.utc)
-    f = open("watchdog.log", "a")
-    f.write(str(timestamp) + " " + theMessage + "\n")
-    f.close()
+    log_dir = os.path.dirname(LOG_PATH)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+    else:
+        raise ValueError("LOG_PATH must include a directory")
+
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    with open(LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(f"{timestamp} {theMessage}\n")
 
 target_data_path = '/home/N000015'
 target_data_file = '2021-03-29T000000Z_N0000015_G1_FN20mp_FRQ_WWV10.csv'
@@ -83,8 +98,7 @@ writeLog("start CSV plotter")
 
 # Prepare variables from supplied arguments
 
-plot_output_path= "/psws/psws/media/plots" # for use on pswsnetwork server
-#plot_output_path = "C:\\temp"  # test
+plot_output_path = PLOT_PATH  # from environment variable
 
 # Retrieve supplied arg(s)
 # Remove the first arg from the list of command line args

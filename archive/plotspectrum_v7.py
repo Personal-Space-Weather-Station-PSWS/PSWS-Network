@@ -32,9 +32,9 @@ application= get_wsgi_application()
 django.setup()
 
 # Imports necessary modules from PSWS database
-from centerfrequencies.models import *
-from observations.models import *
-from stations.models import *
+from apps.centerfrequencies.models import *
+from apps.observations.models import *
+from apps.stations.models import *
 
 plot_output_path= "/home/plots" # for use on pswsnetwork server
 #plot_output_path = "C:\\temp"  # test

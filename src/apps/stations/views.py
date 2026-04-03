@@ -29,6 +29,7 @@ from apps.instruments.tables import InstrumentTable
 from apps.observations.models import Observation
 
 import os, sys
+import subprocess
 import logging
 logger = logging.getLogger(__name__)
 
@@ -138,7 +139,20 @@ def add_station_view(request):
             station.phone_number = form.cleaned_data.get('phone_number')
             station.create_date = datetime.now()
             station.save()
-            os.system('sudo ' + str(settings.BASE_DIR) + '/scripts/ingest/stationcreation4.sh ' + station.station_id + ' ' + station.station_pass)
+            station_creation_script = str(settings.BASE_DIR) + '/scripts/ingest/stationcreation4.sh'
+            try:
+                subprocess.run(
+                    ['sudo', station_creation_script, station.station_id, station.station_pass],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    check=True
+                )
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+                station.delete()  # Roll back station creation if script fails
+                messages.error(request, "An error occurred while setting up your station.")
+                return render(request, 'add_station.html', {'form': form})
+            
             return redirect('stations')
     else:
         form = StationCreationForm()

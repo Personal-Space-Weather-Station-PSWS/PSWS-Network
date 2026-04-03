@@ -31,7 +31,7 @@ env_path = Path(__file__).resolve().parent.parent / 'scripts.env'
 load_dotenv(dotenv_path=env_path)
 
 # Django bootstrap to set up environment for Database access
-from _bootstrap_django import bootstrap 
+from _bootstrap_django import bootstrap
 bootstrap()
 
 PLOT_PATH = os.getenv("PLOT_PATH")
@@ -39,11 +39,11 @@ if not PLOT_PATH:
     raise EnvironmentError("PLOT_PATH not set in scripts.env")
 
 # Imports necessary modules from PSWS database
-from apps.centerfrequencies.models 	import *
-from apps.observations.models 	import *
-from apps.stations.models 		import *
-from apps.instruments.models       	import *
-from apps.instrumenttypes.models   	import *
+from apps.centerfrequencies.models      import *
+from apps.observations.models           import *
+from apps.stations.models               import *
+from apps.instruments.models            import *
+from apps.instrumenttypes.models        import *
 
 plot_output_path = PLOT_PATH  # from environment variable
 
@@ -61,10 +61,10 @@ long_options= ["Help", "theDate", "file"]
 try:
     # Parsing args
     arguments, values = getopt.getopt(argumentList, options, long_options)
-     
+
     # Checking each arg
     for currentArgument, currentValue in arguments:
- 
+
         if currentArgument in ("-h", "--Help"):
             print ("-d YYYY-MM-DD -f filewname")
 
@@ -75,7 +75,7 @@ try:
         elif currentArgument in ("-p", "--outpath"):
             print("outputPath:",currentValue)
             plot_output_path = currentValue
-           
+
         elif currentArgument in ("-e", "--event"):
             print("event:",currentValue)
             event_src_path = currentValue
@@ -106,7 +106,7 @@ dataDir = os.path.join(datapath,filename)
 print("data dir: ", dataDir)
 
 plt.style.use('classic') #TODO: replace w/ '_mpl-gallery-nogrid' when testing on server
-#plt.style.use('_mpl-gallery-nogrid') 
+#plt.style.use('_mpl-gallery-nogrid')
 maidenheadGrid= 'EN91' # Default grid
 
 # Plot creation
@@ -162,14 +162,14 @@ try:
     data_dict = dmr.read(start_idx, start_idx + 2, "lat")
     for key in data_dict.keys():
         theLatitude = data_dict[key]
-        print("Latitude: ",theLatitude)
-        
+    #    print("Latitude: ",theLatitude)
+
     data_dict = dmr.read(start_idx, start_idx + 2, "long")
     for key in data_dict.keys():
         theLongitude = data_dict[key]
-        print("Longitude: ",theLongitude)
-    
-    maidenheadGrid = mh.to_maiden(theLatitude, theLongitude)     
+     #   print("Longitude: ",theLongitude)
+
+    maidenheadGrid = mh.to_maiden(theLatitude, theLongitude)
 
 except IOError:
     print("IO Error; metadata not found at " + metadata_dir)
@@ -203,7 +203,7 @@ for i in range(0,freqCount):
     for j in range(1439):
         try:
             data= do.read_vector(s + offset, 1024, 'ch0')
-            
+
             for val in data:
 #                print(" val type:",type(val))
                 if "ndarray" in  str(type(val)) :   # did DRF return a number or an array?
@@ -214,20 +214,20 @@ for i in range(0,freqCount):
                 # bigarray[bptr]= val[i]
                 bptr += 1
 
-        # Tried to read DRF data but didn't find requested time slice       
+        # Tried to read DRF data but didn't find requested time slice
         except IOError:
             for pad in range(0,1024):
                 # Pad this area with zeros (no signal info; show the gap)
                 bigarray[bptr]= 0
                 bptr += 1
-        
+
         # In narrow case, there are 10 samples/sec, so 600 samples = 1 minute
         # Note: Overlap of the 1024 bins
         offset= offset + 600
         # Progress indicator, marching dots
         if (j % 100 == 0):
             print(".", end='')
-        
+
     # Creates new line for ease of console logging
     print()
 
@@ -252,11 +252,11 @@ for i in range(0,freqCount):
     axs[2*i].set_xlabel('Hours, UTC')
 
     # get info from database for use in plot titles
-    print("Look for station",stationIDstr)    
+    print("Look for station",stationIDstr)
     theStationQS = Station.objects.filter(station_id=stationIDstr) # WDE test
     station_id = theStationQS.values()[0]['id']  # WDE test
     station_nickname = theStationQS.values()[0]['nickname']
-    
+
     #station_nickname= "test station" # WDE testing
     print("axis#",i)
     print("Station name: " + station_nickname)
@@ -266,7 +266,7 @@ for i in range(0,freqCount):
                     + maidenheadGrid + ') Station: ' + station_nickname + " Subchannel " + str(i),
                        fontsize=10)
 
-    
+
     print("File loaded. Frequency: ",freqList[i])
 
     # subplot is                nrows, ncols, index
@@ -291,7 +291,7 @@ for i in range(0,freqCount):
             minute_sample[minute_pointer] = minute_maxs
             minute_maxs = 0
             minute_pointer += 1
-            
+
         else:
             if abs_amplitude[sample] > minute_maxs:
                 minute_maxs = abs_amplitude[sample]
@@ -301,7 +301,7 @@ for i in range(0,freqCount):
     print("instr_type: '" + instr_type + "'")
 
     if instr_type == 'Grape 1 DRF':
-       
+
         for j in range(0,len(minute_sample)-1):
           #  X = (np.abs(minute_sample[j]) - 0.001879 ) / 464. # convert to Vrms using magnitude
             X = (-np.abs(minute_sample[j]) - 0.001879 ) / 464. # convert to Vrms using magnitude
@@ -312,6 +312,18 @@ for i in range(0,freqCount):
         axs[(2*i)+1].plot(calib_amplitude)
         axs[(2*i)+1].set_ylabel('Amplitude, dBm')
 
+    elif instr_type == 'rx888':  # WDE added 2/18/2026
+        for j in  range(0,len(minute_sample)-1):
+            X = minute_sample[j]
+            if X != 0: # Usinsg S. Newell calib data from Feb 2026
+                calib_amplitude[j] =  19.95995 * math.log10(X) + 0.3185
+            else:
+                calib_amplitude[j] = -100  # if zero input, set level to -100 dBm
+        y_min = calib_amplitude.min()
+        y_max = calib_amplitude.max()
+        axs[(2*i)+1].plot(calib_amplitude)
+        axs[(2*i)+1].set_ylabel('Amplitude, dBFS') # decibels Full Scale
+
     else: # in future, add calculations for calibration of additional instruments here (e.g. rx888)
         y_min = minute_sample.min() - 0.05 * minute_sample.min()
         y_max = minute_sample.max() + 0.05 * minute_sample.max()
@@ -320,15 +332,16 @@ for i in range(0,freqCount):
 
     print("Plot amplitude",i," on axis",(2*i)+1)
    # axs[(2*i)+1].plot(minute_sample)
-    
+
 
     plt.xticks(np.arange(0,1560, 120), labels=['00','02','04','06','08','10','12','14','16','18','20','22','24'])
 
-        
+
     axs[(2*i)+1].set_xlabel('Hours, UTC')
-    axs[(2*i)+1].set_title('Peak Amplitude by Minute' ) 
+    axs[(2*i)+1].set_title('Peak Amplitude by Minute' )
     axs[(2*i)+1].set_ylim(y_min,y_max)
-    
+
+
 fig.tight_layout()
 output_filename =  stationIDstr + '_' + instrumentID + '_' + t + '_' + maidenheadGrid + '.png'
 plt.savefig(plot_output_path + '/' + stationIDstr + '_' + instrumentID + '_' + t + '_' + maidenheadGrid + '.png')
@@ -346,7 +359,6 @@ obs_id   = theObsQS.values()[0]["id"]
 obs_instance = Observation.objects.get(id = obs_id)
 obs_instance.plotFile = output_filename
 obs_instance.plotPath = plot_output_path
-obs_instance.save()
+obs_instance.save() # COMMENT THIS OUT FOR TESTING
 
 plt.close('all')
-
