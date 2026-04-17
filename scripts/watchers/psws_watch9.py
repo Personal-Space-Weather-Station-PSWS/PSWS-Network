@@ -50,6 +50,12 @@ def get_size(start_path): # Calculate size of directory containing observation
 
     return total_size
 
+def fix_permissions(path):
+    try:
+        subprocess.run(["chmod", "-R", "755", path], check=True)
+        writeLog(f"Successfully applied 755 permissions to {path}")
+    except (subprocess.CalledProcessError, OSError) as e:
+        writeLog(f"ERROR - failed to set permissions on {path}: {e}")
 # These routines support the watchdog polling system
 
 def is_parent_of_interest(name: str) -> bool:
@@ -120,6 +126,7 @@ class TriggerDirHandler(FileSystemEventHandler):
                     writeLog("call to psws_addCSV cmd=" + cmd)
                     print("psws_addCSV cmd:",cmd)
                     os.system(cmd)
+                    fix_permissions(path)
                     return
 
 
@@ -235,6 +242,7 @@ class TriggerDirHandler(FileSystemEventHandler):
                     writeLog("Issuing command:" + command)
                     args = list(command.split(" "))
                     subprocess.run(args)
+                    fix_permissions(path)
                     # Removes target directory
                     os.rmdir(event.src_path)
                     writeLog("Removed directory:" + event.src_path)
@@ -283,6 +291,7 @@ class TriggerDirHandler(FileSystemEventHandler):
                     # Using venv instead of os.system
                     args = list(command.split(" "))
                     subprocess.run(args)
+                    fix_permissions(path)
 
                     # Removes target directory
                     os.rmdir(event.src_path)
