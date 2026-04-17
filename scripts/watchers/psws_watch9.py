@@ -54,7 +54,7 @@ def fix_permissions(path):
     try:
         subprocess.run(["chmod", "-R", "755", path], check=True)
         writeLog(f"Successfully applied 755 permissions to {path}")
-    except subprocess.CalledProcessError as e:
+    except (subprocess.CalledProcessError, OSError) as e:
         writeLog(f"ERROR - failed to set permissions on {path}: {e}")
 # These routines support the watchdog polling system
 
