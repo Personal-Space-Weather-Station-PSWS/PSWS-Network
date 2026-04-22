@@ -6,11 +6,6 @@
 #
 # The full license is in the LICENSE file, distributed with this software.
 # ----------------------------------------------------------------------------
-from django.contrib import admin
+from django.test import TestCase
 
-# Register your models here.
-
-from .models import Observation, DataProduct
-
-admin.site.register(Observation)
-admin.site.register(DataProduct)
+# Create your tests here.
