@@ -17,6 +17,7 @@ from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
 from django_tables2 import SingleTableView
 from django.conf import settings
+from django.db import transaction
 
 import maidenhead as mh
 from .tables import StationTable, FilteredStationTable, StationUserTable, StationInstrumentTable
