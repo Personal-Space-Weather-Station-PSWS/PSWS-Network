@@ -6,11 +6,8 @@
 #
 # The full license is in the LICENSE file, distributed with this software.
 # ----------------------------------------------------------------------------
-from django.contrib import admin
+from django.apps import AppConfig
 
-# Register your models here.
 
-from .models import Observation, DataProduct
-
-admin.site.register(Observation)
-admin.site.register(DataProduct)
+class FileformatsConfig(AppConfig):
+    name = 'apps.fileformats'

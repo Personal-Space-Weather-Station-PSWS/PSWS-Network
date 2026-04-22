@@ -1,11 +1,3 @@
-# ----------------------------------------------------------------------------
-# Copyright (c) 2026 University of Alabama, Digital Forensics and Control Systems Security Lab (DCSL)
-# All rights reserved.
-#
-# Distributed under the terms of the BSD 3-clause license.
-#
-# The full license is in the LICENSE file, distributed with this software.
-# ----------------------------------------------------------------------------
 #!/usr/bin/env python3
 
 # THese imports support interoperation with Django and digital_rf objects
@@ -58,6 +50,12 @@ def get_size(start_path): # Calculate size of directory containing observation
 
     return total_size
 
+def fix_permissions(path):
+    try:
+        subprocess.run(["chmod", "-R", "755", path], check=True)
+        writeLog(f"Successfully applied 755 permissions to {path}")
+    except (subprocess.CalledProcessError, OSError) as e:
+        writeLog(f"ERROR - failed to set permissions on {path}: {e}")
 # These routines support the watchdog polling system
 
 def is_parent_of_interest(name: str) -> bool:
@@ -75,7 +73,7 @@ class TriggerDirHandler(FileSystemEventHandler):
             leaf = os.path.basename(event.src_path)
             if leaf in TRIGGER_NAMES or leaf[0] in TRIGGER_NAMES:
                 writeLog(f"[TRIGGER] {event.src_path} created under {self.parent_path}")
- 
+
    # Process a test trigger; if it is m_Test, delete is, else leave it.
                 if event.src_path.rsplit('/')[-1] == 'm_Test':
                     print("Test file seen!")
@@ -84,12 +82,12 @@ class TriggerDirHandler(FileSystemEventHandler):
                     os.rmdir(event.src_path)
                     print("Removed directory:" + event.src_path)
                     return
- 
+
                 print("UPLOAD trigger at local time: " + dt.now().isoformat())
                 writeLog("parsed event 0=" + event.src_path.rsplit('/')[0] + ',1=' +event.src_path.rsplit('/')[1] + \
 
                   ',2=' + event.src_path.rsplit('/')[2] + ',3=' + event.src_path.rsplit('/')[3])
-   
+
   # Now we have trigger directory; does it contain an instrument number?
                 try:
                     instrumentNo = event.src_path.split("_#")[1] # this should be instrument_>
@@ -107,11 +105,11 @@ class TriggerDirHandler(FileSystemEventHandler):
                     writeLog("Observation#=" + observation_no)
                     path =        "/".join(event.src_path.rsplit('/')[:-1]) + '/csvData/' + observation_no
                     writeLog("Path generated -> " + path)
-                    obsSize = get_size(path)  
+                    obsSize = get_size(path)
                     stationID = observation_no.rsplit('_')[1]
                     # if this is the 8-character node number, remove the leading zero in the number
                     # (This is normal for Grape 1 Legacy stations)
-                    if len(stationID) == 8:   
+                    if len(stationID) == 8:
                         stationID = stationID[0] + stationID[2:8]
                     writeLog("Station#=" + stationID)
                     print("StationID=",stationID)
@@ -119,7 +117,7 @@ class TriggerDirHandler(FileSystemEventHandler):
                     writeLog("Instrument#=" + instrumentID)
                     if event.src_path.rsplit('/')[3][0] == 'g':
                        trigger = event.src_path.rsplit('/')[3]  # this is non-jailed account
-                    else:                     
+                    else:
                        trigger = event.src_path.rsplit('/')[6] # this is jailed account
                     writeLog("trigger=" + trigger)
                     # for calling addCSV, arguments are: (1) path, (2) station_id, (3) instrument, (4) trigger
@@ -127,7 +125,8 @@ class TriggerDirHandler(FileSystemEventHandler):
                         " " + instrumentID + " " + trigger
                     writeLog("call to psws_addCSV cmd=" + cmd)
                     print("psws_addCSV cmd:",cmd)
-                    os.system(cmd)            
+                    os.system(cmd)
+                    fix_permissions(path)
                     return
 
 
@@ -197,7 +196,7 @@ class TriggerDirHandler(FileSystemEventHandler):
                     if type(dataRate) == None:
                         writeLog('sample_rate_numerator not found in metadata; skipping record')
                         print('sample_rate_numerator not found; skip')
-                        return 
+                        return
                     if uploadType == 'c': # is sample_rate numerator a float or a list
                         if isinstance(freq_list, float):
                             centerFrequency = freq_list # this should be a float
@@ -229,7 +228,7 @@ class TriggerDirHandler(FileSystemEventHandler):
                     command = 'ts -S 12'    # set task spooler to support up to 12 simultaneous taaks
                     args = list(command.split(" "))
                     subprocess.run(args)
-                    
+
                     command = "/opt/venv311/bin/python psws_addOBS.py " + str(dataRate) + " " + str(obsSize) + " " +  \
                         fileName + " " + datapath + " " + station_id + " " + instrumentNo + " " + \
                         startDate + " " + endDate + " "
@@ -243,6 +242,7 @@ class TriggerDirHandler(FileSystemEventHandler):
                     writeLog("Issuing command:" + command)
                     args = list(command.split(" "))
                     subprocess.run(args)
+                    fix_permissions(path)
                     # Removes target directory
                     os.rmdir(event.src_path)
                     writeLog("Removed directory:" + event.src_path)
@@ -250,12 +250,10 @@ class TriggerDirHandler(FileSystemEventHandler):
 # End of database section
 
 
-
-
                     try:
                         writeLog("Trigger graphing  program")
                         # This uses task spooler (ts) to make multiple plot jobs run in a queue
-                        graph_command = "ts /opt/venv311/bin/python3 /var/www/html/plotspectrum_v8.py -e " + \
+                        graph_command = "ts /srv/PSWS-Network/venv312/bin/python3 /srv/PSWS-Network/scripts/plotters/plotspectrum.py -e " + \
                             event.src_path  # plot path will be set in plotspectrum
                         writeLog("Running graph_command ----> " + graph_command)
                         os.system(graph_command)
@@ -264,7 +262,6 @@ class TriggerDirHandler(FileSystemEventHandler):
                     except Exception as ex:
                         print("Exception: ", str(ex))
                         writeLog("Exception: " + str(ex))
-
 
 
                 elif event.src_path.rsplit('/')[-1][0] == 'm': # processing for "m" (magnetometer) type upload
@@ -294,6 +291,7 @@ class TriggerDirHandler(FileSystemEventHandler):
                     # Using venv instead of os.system
                     args = list(command.split(" "))
                     subprocess.run(args)
+                    fix_permissions(path)
 
                     # Removes target directory
                     os.rmdir(event.src_path)

@@ -8,9 +8,6 @@
 # ----------------------------------------------------------------------------
 from django.contrib import admin
 
-# Register your models here.
+from .models import ProductType
 
-from .models import Observation, DataProduct
-
-admin.site.register(Observation)
-admin.site.register(DataProduct)
+admin.site.register(ProductType)
