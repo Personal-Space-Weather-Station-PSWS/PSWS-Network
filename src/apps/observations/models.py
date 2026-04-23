@@ -13,6 +13,9 @@ from apps.instruments.models import Instrument
 from apps.bands.models import Band
 from apps.datatypes.models import DataType
 from apps.centerfrequencies.models import CenterFrequency
+from apps.producttypes.models import ProductType
+from apps.fileformats.models import FileFormat
+from apps.filestatuses.models import FileStatus
 
 class Observation(models.Model):
     #
@@ -44,3 +47,24 @@ class Observation(models.Model):
 
     def __str__(self):
         return 'Observation_' + self.station.station_id + '_' + self.fileName
+
+
+class DataProduct(models.Model):
+    observation = models.ForeignKey(Observation, on_delete=models.CASCADE)
+    path = models.CharField(max_length=60)
+    fileName = models.CharField(max_length=60)
+    dataType = models.ForeignKey(DataType, on_delete=models.CASCADE)
+    size = models.BigIntegerField()
+    created_by = models.CharField(max_length=40, null=True, blank=True)
+    created_by_program = models.CharField(max_length=20, null=True, blank=True)
+    date_created = models.DateTimeField(auto_now_add=True)
+    productType = models.ForeignKey(ProductType, on_delete=models.CASCADE)
+    description = models.CharField(max_length=80, null=True, blank=True)
+    fileFormat = models.ForeignKey(FileFormat, on_delete=models.CASCADE)
+    tags = models.CharField(max_length=40, null=True, blank=True)
+    DOI = models.CharField(max_length=40, null=True, blank=True)
+    Notes = models.CharField(max_length=80, null=True, blank=True)
+    fileStatus = models.ForeignKey(FileStatus, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return 'DataProduct_' + str(self.observation.id) + '_' + self.fileName

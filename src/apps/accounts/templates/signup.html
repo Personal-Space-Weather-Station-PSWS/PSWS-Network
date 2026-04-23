@@ -3,7 +3,7 @@
 
 <div>
   {% if user.is_authenticated %}
-  <ul>
+  <ul class="Menu">
     <li><a href="/home">Home</a></li>
     <li><a href="/stations/stations">Stations</a></li>
     <li><a href="/observations/observation_list">Observations</a></li>
@@ -19,8 +19,9 @@
     <li><a href="{% url 'profile' %}">{{ request.user.username }}</a></li>
     <li style="float:right"><a href="/about/">About</a></li>
   </ul>
+  
   {% else %}
-  <ul>
+  <ul class="Menu">
     <li><a href="/home">Home</a></li>
     <li><a href="/stations/stations">Stations</a></li>
     <li><a href="/observations/observation_list">Observations</a></li>
@@ -51,7 +52,7 @@ If the web site or database is breached, no assurances are given that you will b
       {{ field.label_tag }}<br>
       {{ field }}
       {% if field.help_text %}
-        <small style="color: white">{{ field.help_text }}</small>
+        <small style="color: gray">{{ field.help_text }}</small>
       {% endif %}
       {% for error in field.errors %}
         <p style="color: red">{{ error }}</p>
