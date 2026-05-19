@@ -24,7 +24,7 @@ dotenv==0.9.9
 fonttools==4.60.2
 gunicorn==23.0.0
 h5py==3.14.0
-idna==3.10
+idna==3.15
 Jinja2==3.1.6
 kiwisolver==1.4.9
 maidenhead==1.8.0
@@ -37,7 +37,7 @@ netCDF4==1.7.2
 numpy==2.3.1
 packaging==25.0
 pandas==2.3.3
-paramiko==3.5.1
+paramiko==5.0.0
 pillow==12.2.0
 plotly==6.3.0
 pvlib==0.13.1
@@ -58,6 +58,6 @@ sqlparse==0.5.4
 tqdm==4.67.1
 typing_extensions==4.15.0
 tzdata==2025.2
-urllib3==2.6.3
+urllib3==2.7.0
 watchdog==6.0.0
 xarray==2025.9.1
