@@ -6,11 +6,11 @@
 #
 # The full license is in the LICENSE file, distributed with this software.
 # ----------------------------------------------------------------------------
-from django.contrib import admin
+from django.db import models
 
-# Register your models here.
 
-from .models import Observation, DataProduct
+class ProductType(models.Model):
+    productType = models.CharField(max_length=40)
 
-admin.site.register(Observation)
-admin.site.register(DataProduct)
+    def __str__(self):
+        return self.productType

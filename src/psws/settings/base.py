@@ -113,6 +113,9 @@ LOCAL_APPS = [
     "apps.instruments",
     "apps.instrumenttypes",
     "apps.centerfrequencies",
+    "apps.producttypes",
+    "apps.fileformats",
+    "apps.filestatuses",
     "apps.analysis",
 ]
 

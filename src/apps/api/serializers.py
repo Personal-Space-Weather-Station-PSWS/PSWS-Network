@@ -8,7 +8,7 @@
 # ----------------------------------------------------------------------------
 from rest_framework import serializers
 from apps.stations.models import Station
-from apps.observations.models import Observation
+from apps.observations.models import Observation, DataProduct
 
 class StationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -24,3 +24,13 @@ class StationStopSerializer(serializers.ModelSerializer):
     class Meta:
         model = Station
         fields = ['station_id', 'station_pass']
+
+
+class DataProductSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DataProduct
+        fields = [
+            'id', 'observation', 'path', 'fileName', 'dataType', 'size',
+            'created_by', 'created_by_program', 'date_created', 'productType',
+            'description', 'fileFormat', 'tags', 'DOI', 'Notes', 'fileStatus'
+        ]
