@@ -11,6 +11,29 @@
     </div>
 {% endfor %}
 
+<style>
+    .dpTable {
+        margin-left: auto;
+        margin-right: auto;
+        width: 100%;
+        max-width: 1200px;
+        border: 3px solid black;
+        margin-top: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .dpTable th,
+    .dpTable td {
+        padding: 8px;
+        border-bottom: 1px solid #dcdde0;
+        text-align: left;
+    }
+
+    .dpTable th {
+        border-bottom: 2px solid #dcdde0;
+    }
+</style>
+
 <div class="parent">
     <div class="child">
         <ul>
@@ -73,5 +96,36 @@
 	<img src= "/media/{{observation.plotFile}}" alt="Graph for Observation Unavailable" width="85%" class="border" style="display: block; margin-left: auto; margin-right: auto;">
 </div>
 
-{% endblock main %}
+<div style="margin-top: 2rem; margin-bottom: 2rem;">
+    <h3>Data Products</h3>
+    {% if data_products %}
+    <table class="dpTable">
+        <thead>
+            <tr>
+                <th>Date Created</th>
+                <th>Data Type</th>
+                <th>Size (kB)</th>
+                <th>File Name</th>
+                <th>File Format</th>
+                <th>Created By Program</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in data_products %}
+            <tr>
+                <td>{{ row.data_product.date_created|date:'Y-m-d' }}</td>
+                <td>{{ row.data_product.dataType.dataType }}</td>
+                <td>{{ row.size_kb }}</td>
+                <td><a href="{% url 'data_product_detail' id=row.data_product.id %}">{{ row.data_product.fileName }}</a></td>
+                <td>{{ row.data_product.fileFormat.fileFormat }}</td>
+                <td>{{ row.data_product.created_by_program|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No data products are currently associated with this observation.</p>
+    {% endif %}
+</div>
 
+{% endblock main %}

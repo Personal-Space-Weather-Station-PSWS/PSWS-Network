@@ -21,6 +21,7 @@ from django.core.files.temp import NamedTemporaryFile
 from django.conf import settings
 
 from .models import Observation
+from .models import DataProduct
 from .models import Instrument
 from .tables import ObservationTable
 from .filters import ObservationFilter
@@ -30,10 +31,78 @@ import shutil
 import os
 import mimetypes
 import zipfile
+import posixpath
+from urllib.parse import quote
 
 import digital_rf as drf
 import h5py
 from datetime import datetime
+
+
+def _format_size_kb(size):
+    """Return a display string for bytes as decimal kilobytes."""
+    if size is None:
+        return ""
+    try:
+        return "{:,.1f}".format(float(size) / 1000.0)
+    except (TypeError, ValueError):
+        return ""
+
+
+def _format_size_kb_mb(size):
+    """Return a display string for bytes as decimal kilobytes and megabytes."""
+    if size is None:
+        return ""
+    try:
+        size_float = float(size)
+    except (TypeError, ValueError):
+        return ""
+    return "{:,.1f} kB / {:,.3f} MB".format(size_float / 1000.0, size_float / 1000000.0)
+
+
+def _data_product_file_info(data_product):
+    """Build URL, filesystem path, existence, MIME, and display flags for a DataProduct file.
+
+    DataProduct.path is expected to be relative to MEDIA_ROOT, for example:
+    data_products/plots/ or data_products/movies/.
+    """
+    dp_path = (data_product.path or "").replace("\\", "/").strip().lstrip("/")
+    file_name = (data_product.fileName or "").replace("\\", "/").strip().lstrip("/")
+
+    relative_path = posixpath.normpath(posixpath.join(dp_path, file_name))
+    if relative_path == ".":
+        relative_path = ""
+
+    media_root = os.path.abspath(settings.MEDIA_ROOT)
+    full_path = os.path.abspath(os.path.join(media_root, relative_path))
+
+    # Keep filesystem checks inside MEDIA_ROOT, even if a bad path is stored.
+    if full_path != media_root and not full_path.startswith(media_root + os.sep):
+        full_path = None
+        file_exists = False
+    else:
+        file_exists = os.path.isfile(full_path)
+
+    media_url = settings.MEDIA_URL.rstrip("/") + "/"
+    file_url = media_url + quote(relative_path, safe="/") if relative_path else media_url
+
+    mime_type, _ = mimetypes.guess_type(file_name or relative_path)
+    file_format = ""
+    if getattr(data_product, "fileFormat", None) and data_product.fileFormat.fileFormat:
+        file_format = data_product.fileFormat.fileFormat.lower()
+
+    is_plot = file_format == "png" or (mime_type or "").startswith("image/")
+    is_movie = file_format == "mp4" or (mime_type or "").startswith("video/")
+
+    return {
+        "relative_path": relative_path,
+        "full_path": full_path,
+        "url": file_url,
+        "exists": file_exists,
+        "mime_type": mime_type,
+        "is_plot": is_plot,
+        "is_movie": is_movie,
+    }
 
 def download_plot(request, id=None):
     """ Downloads observation plot to local computer using website
@@ -263,8 +332,45 @@ def select_download_range(request, id=None):
     else:
         centerfreq      = None
 
+    data_products = []
+    for data_product in (
+        DataProduct.objects
+        .filter(observation=observation)
+        .select_related('dataType', 'fileFormat')
+        .order_by('-date_created', '-id')
+    ):
+        data_products.append({
+            'data_product': data_product,
+            'size_kb': _format_size_kb(data_product.size),
+        })
+
     form_class  = DateTimeForm
-    return render(request, 'select_download_range.html', {'observation': observation, 'datatype': datatype, 'centerfreq': centerfreq, 'form': form_class})
+    return render(request, 'select_download_range.html', {'observation': observation, 'datatype': datatype, 'centerfreq': centerfreq, 'form': form_class, 'data_products': data_products})
+
+
+def data_product_detail(request, id=None):
+    data_product = get_object_or_404(
+        DataProduct.objects.select_related(
+            'observation',
+            'dataType',
+            'fileFormat',
+            'fileStatus',
+            'productType',
+        ),
+        id=id,
+    )
+
+    file_info = _data_product_file_info(data_product)
+
+    return render(
+        request,
+        'data_product_detail.html',
+        {
+            'data_product': data_product,
+            'file_info': file_info,
+            'size_display': _format_size_kb_mb(data_product.size),
+        },
+    )
 
 # Display a list of all observations in the database
 #class ObservationListView(SingleTableView):
