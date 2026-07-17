@@ -19,7 +19,7 @@ django-crispy-forms==2.4
 django-filter==25.1
 django-smoke-tests==2.1.0
 django-tables2==2.7.5
-djangorestframework==3.15.2
+djangorestframework==3.17.1
 dotenv==0.9.9
 fonttools==4.60.2
 gunicorn==23.0.0
@@ -53,7 +53,7 @@ PyYAML==6.0.3
 requests==2.33.0
 scipy==1.16.2
 six==1.17.0
-soupsieve==2.8
+soupsieve==2.8.4
 sqlparse==0.5.4
 tqdm==4.67.1
 typing_extensions==4.15.0
