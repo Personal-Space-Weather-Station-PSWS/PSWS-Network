@@ -18,6 +18,7 @@ urlpatterns = [
         path('download/<int:id>/', views.download_range, name='download_range'),
         path('range/<int:id>/', views.get_date_range, name='get_date_range'),
         path('select_download_range/<int:id>/', views.select_download_range, name='select_download_range'),
+        path('data_product/<int:id>/', views.data_product_detail, name='data_product_detail'),
         path('download_range/<int:id>/', views.download_range, name='download_range'),
         path('downloadapi/', ObservationDownloadAPIView.as_view(), name='observation-download'),
         ]
