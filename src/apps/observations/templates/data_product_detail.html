@@ -1,0 +1,85 @@
+{% extends "base_observations.html" %}
+
+{% block title %}<h1 class="text-center">{{ data_product.observation }}</h1>{% endblock title %}
+
+{% block main %}
+
+<style>
+    .dp-preview {
+        margin-top: 2rem;
+        margin-bottom: 2rem;
+        padding: 1rem;
+        border: 3px solid black;
+        min-height: 200px;
+    }
+
+    .dp-download-button,
+    .dp-disabled-button {
+        display: inline-block;
+        padding: 6px 12px;
+        border: 1px solid #888;
+        border-radius: 2px;
+        text-decoration: none;
+        color: #000;
+        background-color: #efefef;
+    }
+
+    .dp-disabled-button {
+        color: #777;
+        background-color: #ddd;
+        cursor: not-allowed;
+    }
+</style>
+
+<div class="parent">
+    <div class="child">
+        <ul>
+            <li class="details">ID: {{ data_product.id }}</li>
+            <li class="details">Filename: {{ data_product.fileName }}</li>
+            <li class="details">Size: {{ size_display }}</li>
+            {% if data_product.created_by %}<li class="details">Created by: {{ data_product.created_by }}</li>{% endif %}
+            {% if data_product.created_by_program %}<li class="details">Created by program: {{ data_product.created_by_program }}</li>{% endif %}
+            <li class="details">Date created: {{ data_product.date_created|date:'M. d, Y, H:i:s' }}</li>
+            {% if data_product.description %}<li class="details">Description: {{ data_product.description }}</li>{% endif %}
+            {% if data_product.DOI %}<li class="details">DOI: {{ data_product.DOI }}</li>{% endif %}
+            {% if data_product.Notes %}<li class="details">Notes: {{ data_product.Notes }}</li>{% endif %}
+            <li class="details">Data type: {{ data_product.dataType.dataType }}</li>
+            <li class="details">File status: {{ data_product.fileStatus.fileStatus }}</li>
+            <li class="details">Data product type: {{ data_product.productType.productType }}</li>
+            <li class="details">Observation ID: <a href="{% url 'select_download_range' id=data_product.observation.id %}">{{ data_product.observation.id }}</a></li>
+            {% if data_product.tags %}<li class="details">Tags: {{ data_product.tags }}</li>{% endif %}
+        </ul>
+    </div>
+    <div class="child">
+        <p>Press the button below to download the file</p>
+        {% if file_info.exists %}
+            <a class="dp-download-button" href="{{ file_info.url }}" download>Download File</a>
+        {% else %}
+            <button type="button" class="dp-disabled-button" disabled>Download File</button>
+            <p><strong>File is not currently available.</strong></p>
+        {% endif %}
+    </div>
+</div>
+
+<div>
+    <a href="{% url 'select_download_range' id=data_product.observation.id %}">Back</a>
+</div>
+
+<div class="dp-preview">
+    {% if file_info.exists %}
+        {% if file_info.is_plot %}
+            <img src="{{ file_info.url }}" alt="Data product plot" width="85%" style="display: block; margin-left: auto; margin-right: auto;">
+        {% elif file_info.is_movie %}
+            <video controls width="85%" style="display: block; margin-left: auto; margin-right: auto;">
+                <source src="{{ file_info.url }}" type="{{ file_info.mime_type|default:'video/mp4' }}">
+                Your browser does not support the video tag.
+            </video>
+        {% else %}
+            <p>This data product file type cannot be previewed in the browser. Use the download button to retrieve the file.</p>
+        {% endif %}
+    {% else %}
+        <p><strong>File is not currently available.</strong></p>
+    {% endif %}
+</div>
+
+{% endblock main %}
