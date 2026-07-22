@@ -45,7 +45,7 @@ class Observation(models.Model):
     # Timestamp from which the observation ended for the given time period
     endDate = models.DateTimeField("End Date (UTC)", null=True, blank=True)
     # Level of file, where 0 = original, higher numbers are computed or cleaned
-    fileLevel = models.IntegerField(default = 0)
+    fileLevel = models.IntegerField(default=0)
 
     def __str__(self):
         return 'Observation_' + self.station.station_id + '_' + self.fileName
