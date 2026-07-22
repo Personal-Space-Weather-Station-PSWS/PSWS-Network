@@ -62,10 +62,7 @@
 </div>
 
 <div>
-    <form action="javascript: history.back()" method="GET">
-        {% csrf_token %}
-        <button type="submit">Back</button>
-    </form>
+    <a href="{% url 'select_download_range' id=data_product.observation.id %}">Back</a>
 </div>
 
 <div class="dp-preview">

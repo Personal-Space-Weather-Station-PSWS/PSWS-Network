@@ -67,7 +67,7 @@ class DataProduct(models.Model):
     DOI = models.CharField(max_length=40, null=True, blank=True)
     Notes = models.CharField(max_length=80, null=True, blank=True)
     fileStatus = models.ForeignKey(FileStatus, on_delete=models.CASCADE)
-    fileLevel = models.IntegerField(default = 1)
+    fileLevel = models.IntegerField(default=1)
 
     def __str__(self):
         return 'DataProduct_' + str(self.observation.id) + '_' + self.fileName
