@@ -127,6 +127,9 @@ class TriggerDirHandler(FileSystemEventHandler):
                     print("psws_addCSV cmd:",cmd)
                     os.system(cmd)
                     fix_permissions(path)
+                    # Removes target directory
+                    os.rmdir(event.src_path)
+                    writeLog("Removed directory:" + event.src_path)
                     return
 
 
