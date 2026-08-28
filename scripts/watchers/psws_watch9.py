@@ -235,13 +235,21 @@ class TriggerDirHandler(FileSystemEventHandler):
                     command = "/opt/venv311/bin/python /var/www/html/psws_addOBS.py " + str(dataRate) + " " + str(obsSize) + " " +  \
                         fileName + " " + datapath + " " + station_id + " " + instrumentNo + " " + \
                         startDate + " " + endDate + " "
-                    flist = freq_list.tolist()
-                    writeLog('Add frequencies to addOBS command, ' + str(flist) + str(type(flist)))
-                    if isinstance(freq_list, float):   # this is a single float or a list
-                        command = command + str(freq_list) + " "  # this is a single value
-                    elif isinstance(flist, list):
+                    # Determine safety of doing a "tolist" call
+                    if hasattr(freq_list, "tolist"):
+                        flist = freq_list.tolist()
+                    else:
+                        flist = freq_list
+                    # Write to Logs what frequencies we are adding to the Observation    
+                    writeLog('Add frequencies to addOBS command, '+ str(flist) + str(type(flist)))
+                    # Create Command with tuple (int, float)
+                    if isinstance(flist, (int, float)):
+                        command = command + str(flist) + " "
+                    # Else if create Command with tuple (list, tuple)
+                    elif isinstance(flist, (list, tuple)):
                         for this_freq in flist:
                             command = command + str(this_freq) + " "
+                    
                     print   ("Issuing command:" + command)
                     writeLog("Issuing command:" + command)
                     args = list(command.split(" "))
