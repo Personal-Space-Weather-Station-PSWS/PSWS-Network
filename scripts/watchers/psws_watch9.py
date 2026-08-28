@@ -160,7 +160,7 @@ class TriggerDirHandler(FileSystemEventHandler):
                     # get list of center frequencies in this spectrum (often just 1)
                     data_dict = dmr.read(start_idx, start_idx + 2, "center_frequencies")
                     for x in list(data_dict)[0:1]:
-                         #writeLog("key{}, val{}:".format(x, data_dict[x]))
+                        writeLog("key{}, val{}:".format(x, data_dict[x]))
                         print("key{}, val{}:".format(x, data_dict[x]))
                         freq_list = data_dict[x]
                     # GRAPHING COMMAND
@@ -232,14 +232,15 @@ class TriggerDirHandler(FileSystemEventHandler):
                     args = list(command.split(" "))
                     subprocess.run(args)
 
-                    command = "/opt/venv311/bin/python psws_addOBS.py " + str(dataRate) + " " + str(obsSize) + " " +  \
+                    command = "/opt/venv311/bin/python /var/www/html/psws_addOBS.py " + str(dataRate) + " " + str(obsSize) + " " +  \
                         fileName + " " + datapath + " " + station_id + " " + instrumentNo + " " + \
                         startDate + " " + endDate + " "
-
+                    flist = freq_list.tolist()
+                    writeLog('Add frequencies to addOBS command, ' + str(flist) + str(type(flist)))
                     if isinstance(freq_list, float):   # this is a single float or a list
                         command = command + str(freq_list) + " "  # this is a single value
-                    elif isinstance(freq_list, list):
-                        for this_freq in freq_list:
+                    elif isinstance(flist, list):
+                        for this_freq in flist:
                             command = command + str(this_freq) + " "
                     print   ("Issuing command:" + command)
                     writeLog("Issuing command:" + command)
