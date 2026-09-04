@@ -19,7 +19,7 @@ django-crispy-forms==2.4
 django-filter==25.1
 django-smoke-tests==2.1.0
 django-tables2==2.7.5
-djangorestframework==3.17.1
+djangorestframework==3.17.2
 dotenv==0.9.9
 fonttools==4.60.2
 gunicorn==23.0.0
