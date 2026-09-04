@@ -54,7 +54,7 @@ requests==2.33.0
 scipy==1.16.2
 six==1.17.0
 soupsieve==2.8.4
-sqlparse==0.5.4
+sqlparse==0.6.0
 tqdm==4.67.1
 typing_extensions==4.15.0
 tzdata==2025.2
