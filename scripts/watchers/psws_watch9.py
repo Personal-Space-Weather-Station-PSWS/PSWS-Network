@@ -28,18 +28,21 @@ ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else "/home")
 
 TRIGGER_NAMES = {"m", "t", "g", "c", "m_Test"}
 
-'''
+"""
 def writeLog(msg):
     print(msg, flush=True)  # replace with your real logger
-'''
+"""
+
+
 def writeLog(theMessage):
-    print("log:",theMessage)
+    print("log:", theMessage)
     timestamp = dt.now(timezone.utc).isoformat()[0:19]
     f = open("/var/log/watchdog/watchdog.log", "a")
     f.write(timestamp + " " + theMessage + "\n")
     f.close()
 
-def get_size(start_path): # Calculate size of directory containing observation
+
+def get_size(start_path):  # Calculate size of directory containing observation
     total_size = 0
     for dirpath, dirnames, filenames in os.walk(start_path):
         for f in filenames:
@@ -50,32 +53,38 @@ def get_size(start_path): # Calculate size of directory containing observation
 
     return total_size
 
+
 def fix_permissions(path):
     try:
         subprocess.run(["chmod", "-R", "755", path], check=True)
         writeLog(f"Successfully applied 755 permissions to {path}")
     except (subprocess.CalledProcessError, OSError) as e:
         writeLog(f"ERROR - failed to set permissions on {path}: {e}")
+
+
 # These routines support the watchdog polling system
+
 
 def is_parent_of_interest(name: str) -> bool:
     # Parent directory must be exactly T000001 or start with S/N
     return name == "T000001" or name.startswith(("S", "N"))
 
+
 class TriggerDirHandler(FileSystemEventHandler):
     """Watches ONE parent directory (non-recursive) for the trigger dir(s)."""
+
     def __init__(self, parent_path: Path):
         self.parent_path = Path(parent_path)
 
     def on_created(self, event):
-        print('event detected:',event)
+        print("event detected:", event)
         if event.is_directory:
             leaf = os.path.basename(event.src_path)
             if leaf in TRIGGER_NAMES or leaf[0] in TRIGGER_NAMES:
                 writeLog(f"[TRIGGER] {event.src_path} created under {self.parent_path}")
 
-   # Process a test trigger; if it is m_Test, delete is, else leave it.
-                if event.src_path.rsplit('/')[-1] == 'm_Test':
+                # Process a test trigger; if it is m_Test, delete is, else leave it.
+                if event.src_path.rsplit("/")[-1] == "m_Test":
                     print("Test file seen!")
                     writeLog("Test file seen at  " + event.src_path)
                     print("Located at " + event.src_path)
@@ -84,47 +93,80 @@ class TriggerDirHandler(FileSystemEventHandler):
                     return
 
                 print("UPLOAD trigger at local time: " + dt.now().isoformat())
-                writeLog("parsed event 0=" + event.src_path.rsplit('/')[0] + ',1=' +event.src_path.rsplit('/')[1] + \
+                writeLog(
+                    "parsed event 0="
+                    + event.src_path.rsplit("/")[0]
+                    + ",1="
+                    + event.src_path.rsplit("/")[1]
+                    + ",2="
+                    + event.src_path.rsplit("/")[2]
+                    + ",3="
+                    + event.src_path.rsplit("/")[3]
+                )
 
-                  ',2=' + event.src_path.rsplit('/')[2] + ',3=' + event.src_path.rsplit('/')[3])
-
-  # Now we have trigger directory; does it contain an instrument number?
+                # Now we have trigger directory; does it contain an instrument number?
                 try:
-                    instrumentNo = event.src_path.split("_#")[1] # this should be instrument_>
-                    writeLog("Instrument number found at -> " + event.src_path.split("_#")[1])
+                    instrumentNo = event.src_path.split("_#")[
+                        1
+                    ]  # this should be instrument_>
+                    writeLog(
+                        "Instrument number found at -> " + event.src_path.split("_#")[1]
+                    )
                 except:
                     print("ERROR, parsing failure, the '_#' not found")
                     writeLog("ERROR - parsing failure, the '_#' not found")
                     return
 
-                if event.src_path.rsplit('/')[-1][0] == 'g': # processing for Grape 1 Legacy (fldigi) upload
+                if (
+                    event.src_path.rsplit("/")[-1][0] == "g"
+                ):  # processing for Grape 1 Legacy (fldigi) upload
                     writeLog("processing Grape 1 Legacy trigger:" + event.src_path)
-                    observation_no = event.src_path.rsplit('/')[-1][1:len(event.src_path)] # get entire trigger
-                    observation_no = observation_no.rsplit('_#')[0] # get the filename in trigger
+                    observation_no = event.src_path.rsplit("/")[-1][
+                        1 : len(event.src_path)
+                    ]  # get entire trigger
+                    observation_no = observation_no.rsplit("_#")[
+                        0
+                    ]  # get the filename in trigger
                     print("Observation#=" + observation_no)
                     writeLog("Observation#=" + observation_no)
-                    path =        "/".join(event.src_path.rsplit('/')[:-1]) + '/csvData/' + observation_no
+                    path = (
+                        "/".join(event.src_path.rsplit("/")[:-1])
+                        + "/csvData/"
+                        + observation_no
+                    )
                     writeLog("Path generated -> " + path)
                     obsSize = get_size(path)
-                    stationID = observation_no.rsplit('_')[1]
+                    stationID = observation_no.rsplit("_")[1]
                     # if this is the 8-character node number, remove the leading zero in the number
                     # (This is normal for Grape 1 Legacy stations)
                     if len(stationID) == 8:
                         stationID = stationID[0] + stationID[2:8]
                     writeLog("Station#=" + stationID)
-                    print("StationID=",stationID)
-                    instrumentID = event.src_path.rsplit('_#')[1]
+                    print("StationID=", stationID)
+                    instrumentID = event.src_path.rsplit("_#")[1]
                     writeLog("Instrument#=" + instrumentID)
-                    if event.src_path.rsplit('/')[3][0] == 'g':
-                       trigger = event.src_path.rsplit('/')[3]  # this is non-jailed account
+                    if event.src_path.rsplit("/")[3][0] == "g":
+                        trigger = event.src_path.rsplit("/")[
+                            3
+                        ]  # this is non-jailed account
                     else:
-                       trigger = event.src_path.rsplit('/')[6] # this is jailed account
+                        trigger = event.src_path.rsplit("/")[
+                            6
+                        ]  # this is jailed account
                     writeLog("trigger=" + trigger)
                     # for calling addCSV, arguments are: (1) path, (2) station_id, (3) instrument, (4) trigger
-                    cmd = '/opt/venv311/bin/python3 /var/www/html/psws_addCSV.py ' + path + " " + stationID + \
-                        " " + instrumentID + " " + trigger
+                    cmd = (
+                        "/opt/venv311/bin/python3 /var/www/html/psws_addCSV.py "
+                        + path
+                        + " "
+                        + stationID
+                        + " "
+                        + instrumentID
+                        + " "
+                        + trigger
+                    )
                     writeLog("call to psws_addCSV cmd=" + cmd)
-                    print("psws_addCSV cmd:",cmd)
+                    print("psws_addCSV cmd:", cmd)
                     os.system(cmd)
                     fix_permissions(path)
                     # Removes target directory
@@ -132,29 +174,34 @@ class TriggerDirHandler(FileSystemEventHandler):
                     writeLog("Removed directory:" + event.src_path)
                     return
 
-
-                if event.src_path.rsplit('/')[-1][0] == 'c': # processing for Continuous type upload (Grape 1 DRF)
+                if (
+                    event.src_path.rsplit("/")[-1][0] == "c"
+                ):  # processing for Continuous type upload (Grape 1 DRF)
                     writeLog("Processing trigger:" + event.src_path)
-                    observation_no = event.src_path.rsplit('/')[-1][1:20]
-                    path =        "/".join(event.src_path.rsplit('/')[:-1]) + '/' + observation_no
+                    observation_no = event.src_path.rsplit("/")[-1][1:20]
+                    path = (
+                        "/".join(event.src_path.rsplit("/")[:-1]) + "/" + observation_no
+                    )
                     writeLog("Path generated -> " + path)
                     obsSize = get_size(path)
                     print("Data size=", obsSize)
                     # prepare to get DRF metadata for inclusion into database
                     channelPath = path + "/ch0"
                     print("channel path=" + channelPath)
-                    uploadType = 'c'
+                    uploadType = "c"
                     metadata_dir = channelPath + "/metadata"
                     start_idx = 0
                     try:
-                      dmr = drf.DigitalMetadataReader(metadata_dir)
-                      start_idx = dmr.get_bounds()[0]
-                      print("Start:" , start_idx)
+                        dmr = drf.DigitalMetadataReader(metadata_dir)
+                        start_idx = dmr.get_bounds()[0]
+                        print("Start:", start_idx)
                     except IOError as e:
-                      writeLog("IO error accessing digital metadata, path=" + metadata_dir)
-                      writeLog(str(e))
-                      print("IO error accessing digital metadata")
-                      return
+                        writeLog(
+                            "IO error accessing digital metadata, path=" + metadata_dir
+                        )
+                        writeLog(str(e))
+                        print("IO error accessing digital metadata")
+                        return
                     fields = dmr.get_fields()
                     freq_list = []
                     # get list of center frequencies in this spectrum (often just 1)
@@ -164,84 +211,116 @@ class TriggerDirHandler(FileSystemEventHandler):
                         print("key{}, val{}:".format(x, data_dict[x]))
                         freq_list = data_dict[x]
                     # GRAPHING COMMAND
-                    if not (os.path.isfile(channelPath + '/drf_properties.h5')):
+                    if not (os.path.isfile(channelPath + "/drf_properties.h5")):
                         writeLog("DRF Properties file missing!")
                         return
                     # EMERGENCY CHNAGE TO PREVENT s000123 from crashing watchdog
                     if not (os.path.exists(channelPath)):
-                        writeLog("Channel path does not exist! Might be issue with parsing of trigger file name.")
+                        writeLog(
+                            "Channel path does not exist! Might be issue with parsing of trigger file name."
+                        )
                         return
-                    if not (os.path.exists(channelPath + '/metadata/dmd_properties.h5')):
+                    if not (
+                        os.path.exists(channelPath + "/metadata/dmd_properties.h5")
+                    ):
                         writeLog("DMD Properties file missing!")
                         return
 
-# Add OBS to database section
+                    # Add OBS to database section
 
                     size = 0
                     tar_file = observation_no
-                    #Scrape the metadata from the properties files
+                    # Scrape the metadata from the properties files
                     writeLog("Scraping metadata!")
-                    if (os.path.isfile(channelPath + '/drf_properties.h5')):
-                        fp = h5py.File(channelPath + '/drf_properties.h5','r')
+                    if os.path.isfile(channelPath + "/drf_properties.h5"):
+                        fp = h5py.File(channelPath + "/drf_properties.h5", "r")
                     else:
                         writeLog("Cannot find metadata!")
                         return
-                    if uploadType == 'd':  # this will be obsolete if all uploads standardize on digital_metadata
-                        afp = h5py.File(channelPath + '/aux_drf_properties.h5')
+                    if (
+                        uploadType == "d"
+                    ):  # this will be obsolete if all uploads standardize on digital_metadata
+                        afp = h5py.File(channelPath + "/aux_drf_properties.h5")
                     writeLog("Successfully scraped metadata!")
                     # Getting start time and end time
                     drf_data = drf.DigitalRFReader(path)
-                    startDate, endDate = drf_data.get_bounds('ch0')
+                    startDate, endDate = drf_data.get_bounds("ch0")
                     print("bounds:", startDate, endDate)
                     writeLog("Got Bounds")
-                    #All needed fields for insertion
-                    dataRate = fp.attrs.get('sample_rate_numerator')
+                    # All needed fields for insertion
+                    dataRate = fp.attrs.get("sample_rate_numerator")
                     if type(dataRate) == None:
-                        writeLog('sample_rate_numerator not found in metadata; skipping record')
-                        print('sample_rate_numerator not found; skip')
+                        writeLog(
+                            "sample_rate_numerator not found in metadata; skipping record"
+                        )
+                        print("sample_rate_numerator not found; skip")
                         return
-                    if uploadType == 'c': # is sample_rate numerator a float or a list
+                    if uploadType == "c":  # is sample_rate numerator a float or a list
                         if isinstance(freq_list, float):
-                            centerFrequency = freq_list # this should be a float
+                            centerFrequency = freq_list  # this should be a float
                         elif isinstance(freq_list, (list, dict)):
-                            centerFrequency = freq_list[0] # support one for now
+                            centerFrequency = freq_list[0]  # support one for now
                         datapath = path
                     fileName = tar_file
-                    station_id = path.rsplit('/')[-2]
+                    station_id = path.rsplit("/")[-2]
                     if dataRate is None:
                         print("sample_rate_numerator not found")
-                        writeLog('sample_rate_numerator not found, skipping')
+                        writeLog("sample_rate_numerator not found, skipping")
                         return
                     if startDate is None:
-                        writeLog('startDate missing, skipping')
+                        writeLog("startDate missing, skipping")
                         return
-                    print("startDate:",startDate)
-                    print("dataRate:",dataRate)
+                    print("startDate:", startDate)
+                    print("dataRate:", dataRate)
                     try:
                         myTimestamp = startDate / dataRate
                     except:
-                        writeLog('Bad/missing dataRate in metadata, skipping')
+                        writeLog("Bad/missing dataRate in metadata, skipping")
                         return
-                    startDate = dt.fromtimestamp(myTimestamp, tz=pytz.UTC).strftime('%Y-%m-%dT%H:%M')
+                    startDate = dt.fromtimestamp(myTimestamp, tz=pytz.UTC).strftime(
+                        "%Y-%m-%dT%H:%M"
+                    )
                     print("Start date:" + startDate)
                     myTimestamp = endDate / dataRate
-                    endDate =   dt.fromtimestamp(myTimestamp, tz=pytz.UTC).strftime('%Y-%m-%dT%H:%M')
-                    print("End date:"+endDate)
+                    endDate = dt.fromtimestamp(myTimestamp, tz=pytz.UTC).strftime(
+                        "%Y-%m-%dT%H:%M"
+                    )
+                    print("End date:" + endDate)
 
-                    command = 'ts -S 12'    # set task spooler to support up to 12 simultaneous taaks
+                    command = "ts -S 12"  # set task spooler to support up to 12 simultaneous taaks
                     args = list(command.split(" "))
                     subprocess.run(args)
 
-                    command = "/opt/venv311/bin/python /var/www/html/psws_addOBS.py " + str(dataRate) + " " + str(obsSize) + " " +  \
-                        fileName + " " + datapath + " " + station_id + " " + instrumentNo + " " + \
-                        startDate + " " + endDate + " "
+                    command = (
+                        "/opt/venv311/bin/python /var/www/html/psws_addOBS.py "
+                        + str(dataRate)
+                        + " "
+                        + str(obsSize)
+                        + " "
+                        + fileName
+                        + " "
+                        + datapath
+                        + " "
+                        + station_id
+                        + " "
+                        + instrumentNo
+                        + " "
+                        + startDate
+                        + " "
+                        + endDate
+                        + " "
+                    )
                     # Determine safety of doing a "tolist" call
                     if hasattr(freq_list, "tolist"):
                         flist = freq_list.tolist()
                     else:
                         flist = freq_list
-                    # Write to Logs what frequencies we are adding to the Observation    
-                    writeLog('Add frequencies to addOBS command, '+ str(flist) + str(type(flist)))
+                    # Write to Logs what frequencies we are adding to the Observation
+                    writeLog(
+                        "Add frequencies to addOBS command, "
+                        + str(flist)
+                        + str(type(flist))
+                    )
                     # Create Command with tuple (int, float)
                     if isinstance(flist, (int, float)):
                         command = command + str(flist) + " "
@@ -249,8 +328,8 @@ class TriggerDirHandler(FileSystemEventHandler):
                     elif isinstance(flist, (list, tuple)):
                         for this_freq in flist:
                             command = command + str(this_freq) + " "
-                    
-                    print   ("Issuing command:" + command)
+
+                    print("Issuing command:" + command)
                     writeLog("Issuing command:" + command)
                     args = list(command.split(" "))
                     subprocess.run(args)
@@ -259,14 +338,15 @@ class TriggerDirHandler(FileSystemEventHandler):
                     os.rmdir(event.src_path)
                     writeLog("Removed directory:" + event.src_path)
 
-# End of database section
-
+                    # End of database section
 
                     try:
                         writeLog("Trigger graphing  program")
                         # This uses task spooler (ts) to make multiple plot jobs run in a queue
-                        graph_command = "ts /srv/PSWS-Network/venv312/bin/python3 /srv/PSWS-Network/scripts/plotters/plotspectrum.py -e " + \
-                            event.src_path  # plot path will be set in plotspectrum
+                        graph_command = (
+                            "ts /srv/PSWS-Network/venv312/bin/python3 /srv/PSWS-Network/scripts/plotters/plotspectrum.py -e "
+                            + event.src_path
+                        )  # plot path will be set in plotspectrum
                         writeLog("Running graph_command ----> " + graph_command)
                         os.system(graph_command)
                         # writeLog(graph_command.stdout)
@@ -275,16 +355,19 @@ class TriggerDirHandler(FileSystemEventHandler):
                         print("Exception: ", str(ex))
                         writeLog("Exception: " + str(ex))
 
-
-                elif event.src_path.rsplit('/')[-1][0] == 'm': # processing for "m" (magnetometer) type upload
-                    observation_no = event.src_path.rsplit('/')[-1][1:20]
+                elif (
+                    event.src_path.rsplit("/")[-1][0] == "m"
+                ):  # processing for "m" (magnetometer) type upload
+                    observation_no = event.src_path.rsplit("/")[-1][1:20]
                     print("path from watchdog:" + event.src_path)
-                    path =        '/'.join(event.src_path.rsplit('/')[:-1]) + '/magData'
+                    path = "/".join(event.src_path.rsplit("/")[:-1]) + "/magData"
                     writeLog("Path generated -> " + path)
                     obsSize = get_size(path)
-                    station_id = path.rsplit('/')[-2]
-                    endDate = event.src_path[-16:]  # get the last 16 char of the trigger, this is timestamp of the upload
-                    print('path='+path + ' station_id=' + station_id)
+                    station_id = path.rsplit("/")[-2]
+                    endDate = event.src_path[
+                        -16:
+                    ]  # get the last 16 char of the trigger, this is timestamp of the upload
+                    print("path=" + path + " station_id=" + station_id)
 
                     # Assumptions
                     # Last 16 bytes of trigger directory is time stamp of the upload
@@ -294,8 +377,16 @@ class TriggerDirHandler(FileSystemEventHandler):
 
                     # Make sure to use the correct virtual environment here; needs to match
                     #  what is in /etc/systemd/system/watchX.service
-                    command = "/opt/venv311/bin/python3 /var/www/html/psws_addMAG.py " + path + " " + \
-                              station_id + " " + instrumentNo + " "  + endDate
+                    command = (
+                        "/opt/venv311/bin/python3 /var/www/html/psws_addMAG.py "
+                        + path
+                        + " "
+                        + station_id
+                        + " "
+                        + instrumentNo
+                        + " "
+                        + endDate
+                    )
                     print("Issuing command: " + command)
                     # os.system(command)
                     writeLog("Issued syscommand:" + command)
@@ -303,6 +394,92 @@ class TriggerDirHandler(FileSystemEventHandler):
                     # Using venv instead of os.system
                     args = list(command.split(" "))
                     subprocess.run(args)
+
+                    try:
+                        scripts_root = Path(__file__).resolve().parents[1]
+                        if str(scripts_root) not in sys.path:
+                            sys.path.insert(0, str(scripts_root))
+
+                        from _bootstrap_django import bootstrap
+
+                        bootstrap()
+
+                        try:
+                            from apps.stations.models import Station
+                        except ImportError:
+                            from stations.models import Station
+
+                        station_obj = Station.objects.filter(
+                            station_id=station_id
+                        ).first()
+                        if not station_obj:
+                            writeLog(
+                                "ERROR: Station not found for plotmag: " + station_id
+                            )
+                        else:
+                            plotmag_script = str(
+                                scripts_root / "plotters" / "plotmag.py"
+                            )
+                            candidates = []
+                            for filename in sorted(os.listdir(path)):
+                                if filename.startswith("."):
+                                    continue
+                                if not filename.lower().endswith(
+                                    (".zip", ".csv", ".json", ".log")
+                                ):
+                                    continue
+                                candidates.append(os.path.join(path, filename))
+
+                            for fpath in candidates:
+                                basename = os.path.basename(fpath)
+                                match = re.search(r"(\d{4}-\d{2}-\d{2})", basename)
+                                if match:
+                                    date_str = match.group(1)
+                                else:
+                                    compact_match = re.search(r"(\d{4})(\d{2})(\d{2})", basename)
+                                    if compact_match:
+                                        date_str = "-".join(compact_match.groups())
+                                    else:
+                                        date_str = endDate[0:10]
+                                plot_cmd = [
+                                    "/opt/venv311/bin/python3",
+                                    plotmag_script,
+                                    fpath,
+                                    "--station",
+                                    station_id,
+                                    "--date",
+                                    date_str,
+                                    "--lat",
+                                    str(station_obj.latitude),
+                                    "--long",
+                                    str(station_obj.longitude),
+                                    "--grid",
+                                    station_obj.grid,
+                                    "--nick",
+                                    station_obj.nickname,
+                                    "-i",
+                                    instrumentNo,
+                                ]
+                                writeLog(
+                                    "Running plotmag command for file "
+                                    + fpath
+                                    + " and station "
+                                    + station_id
+                                    + " on "
+                                    + date_str
+                                    + " (location details redacted)"
+                                )
+                                result = subprocess.run(
+                                    plot_cmd, capture_output=True, text=True
+                                )
+                                if result.returncode != 0:
+                                    writeLog("Plotting failed: " + result.stderr)
+                                else:
+                                    writeLog("Plotting successful: " + result.stdout)
+                    except Exception as ex:
+                        print("Exception: ", str(ex))
+                        writeLog("Exception during magnetometer plotting: " + str(ex))
+
                     fix_permissions(path)
 
                     # Removes target directory
@@ -311,14 +488,17 @@ class TriggerDirHandler(FileSystemEventHandler):
                     return
 
                 else:
-                    writeLog("ERROR. Unrecognized upload type: " + event.src_path.rsplit('/')[-1][0] )
+                    writeLog(
+                        "ERROR. Unrecognized upload type: "
+                        + event.src_path.rsplit("/")[-1][0]
+                    )
                     return
-
 
 
 ############### Handlers for watchdog #######################################
 class RootHandler(FileSystemEventHandler):
     """Watches ROOT (non-recursive) for new parent dirs, then adds per-parent watches."""
+
     def __init__(self, observer, root: Path):
         self.observer = observer
         self.root = Path(root)
@@ -328,8 +508,12 @@ class RootHandler(FileSystemEventHandler):
             name = os.path.basename(event.src_path)
             if is_parent_of_interest(name):
                 writeLog(f"[PARENT-NEW] {event.src_path} — adding trigger watch")
-                self.observer.schedule(TriggerDirHandler(Path(event.src_path)),
-                                       event.src_path, recursive=False)
+                self.observer.schedule(
+                    TriggerDirHandler(Path(event.src_path)),
+                    event.src_path,
+                    recursive=False,
+                )
+
 
 def add_existing_parents(observer, root: Path):
     """At startup, add watches for parents that already exist."""
@@ -340,7 +524,6 @@ def add_existing_parents(observer, root: Path):
                 observer.schedule(TriggerDirHandler(child), str(child), recursive=False)
         except PermissionError:
             writeLog(f"[WARN] permission denied scanning {child}")
-
 
 
 ######################################################################################
