@@ -16,6 +16,7 @@ import argparse
 import os
 from datetime import datetime, timezone
 import zipfile
+from io import BytesIO
 from dotenv import load_dotenv
 
 from pathlib import Path
@@ -55,16 +56,16 @@ def writeLog(theMessage):
 def open_maybe_zip(path):
     """
     Returns:
-        file-like object
+        BytesIO object containing the selected data file
         filename inside zip (or actual filename)
     """
     if path.endswith(".zip"):
-        z = zipfile.ZipFile(path, "r")
-        name = z.namelist()[0]
-        f = z.open(name)
-        return f, name
-    else:
-        return open(path, "rb"), os.path.basename(path)
+        with zipfile.ZipFile(path, "r") as z:
+            name = z.namelist()[0]
+            return BytesIO(z.read(name)), name
+
+    with open(path, "rb") as f:
+        return BytesIO(f.read()), os.path.basename(path)
 
 
 def load_dataframe(path):
@@ -82,7 +83,6 @@ def load_dataframe(path):
         df = pd.read_csv(f, names=names, quotechar='"', skipinitialspace=True)
         bx, by, bz = "x", "y", "z"
 
-    f.close()
     return df, inner_name, bx, by, bz
 
 
@@ -144,18 +144,16 @@ def plot_magnetometer(path, station, date, lat, lon, grid, nick, instrument_id):
         df = df.set_index("ts")
 
         writeLog(
-            f"NaN counts before resampling - x: {df[bx].isna().sum()}, y: {
-                df[by].isna().sum()
-            }, z: {df[bz].isna().sum()}"
+            f"NaN counts before resampling - x: {df[bx].isna().sum()}, "
+            f"y: {df[by].isna().sum()}, z: {df[bz].isna().sum()}"
         )
 
         df_avg = df.resample("10min").mean()
 
         writeLog(f"After resampling (before dropna): {len(df_avg)} rows")
         writeLog(
-            f"NaN counts after resampling - x: {df_avg[bx].isna().sum()}, y: {
-                df_avg[by].isna().sum()
-            }, z: {df_avg[bz].isna().sum()}"
+            f"NaN counts after resampling - x: {df_avg[bx].isna().sum()}, "
+            f"y: {df_avg[by].isna().sum()}, z: {df_avg[bz].isna().sum()}"
         )
 
         df_avg = df_avg.dropna(subset=[bx, by, bz], how="all")
@@ -217,9 +215,8 @@ def plot_magnetometer(path, station, date, lat, lon, grid, nick, instrument_id):
         # Update database
         try:
             writeLog(
-                f"Updating database for station {stationIDstr}, instrument {
-                    instrumentID
-                }, file {filename}"
+                f"Updating database for station {stationIDstr}, "
+                f"instrument {instrumentID}, file {filename}"
             )
 
             theStationQS = Station.objects.filter(station_id=stationIDstr)
@@ -234,9 +231,8 @@ def plot_magnetometer(path, station, date, lat, lon, grid, nick, instrument_id):
 
                 if theObsQS.exists():
                     writeLog(
-                        f"Updating observation with plot at: {plot_output_path}/{
-                            output_filename
-                        }"
+                        f"Updating observation with plot at: "
+                        f"{plot_output_path}/{output_filename}"
                     )
                     obs_id = theObsQS.values()[0]["id"]
                     obs_instance = Observation.objects.get(id=obs_id)
@@ -246,9 +242,8 @@ def plot_magnetometer(path, station, date, lat, lon, grid, nick, instrument_id):
                     writeLog("Database update successful")
                 else:
                     writeLog(
-                        f"WARNING: No observation found for station {
-                            station_id
-                        }, instrument {instrumentID}, file {actual_filename}"
+                        f"WARNING: No observation found for station {station_id}, "
+                        f"instrument {instrumentID}, file {actual_filename}"
                     )
             else:
                 writeLog(f"WARNING: Station {stationIDstr} not found in database")

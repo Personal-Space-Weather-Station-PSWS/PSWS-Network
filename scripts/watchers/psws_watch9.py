@@ -237,10 +237,6 @@ class TriggerDirHandler(FileSystemEventHandler):
                     else:
                         writeLog("Cannot find metadata!")
                         return
-                    if (
-                        uploadType == "d"
-                    ):  # this will be obsolete if all uploads standardize on digital_metadata
-                        afp = h5py.File(channelPath + "/aux_drf_properties.h5")
                     writeLog("Successfully scraped metadata!")
                     # Getting start time and end time
                     drf_data = drf.DigitalRFReader(path)
@@ -249,17 +245,13 @@ class TriggerDirHandler(FileSystemEventHandler):
                     writeLog("Got Bounds")
                     # All needed fields for insertion
                     dataRate = fp.attrs.get("sample_rate_numerator")
-                    if type(dataRate) == None:
+                    if dataRate is None:
                         writeLog(
                             "sample_rate_numerator not found in metadata; skipping record"
                         )
                         print("sample_rate_numerator not found; skip")
                         return
-                    if uploadType == "c":  # is sample_rate numerator a float or a list
-                        if isinstance(freq_list, float):
-                            centerFrequency = freq_list  # this should be a float
-                        elif isinstance(freq_list, (list, dict)):
-                            centerFrequency = freq_list[0]  # support one for now
+                    if uploadType == "c":
                         datapath = path
                     fileName = tar_file
                     station_id = path.rsplit("/")[-2]
@@ -358,7 +350,6 @@ class TriggerDirHandler(FileSystemEventHandler):
                 elif (
                     event.src_path.rsplit("/")[-1][0] == "m"
                 ):  # processing for "m" (magnetometer) type upload
-                    observation_no = event.src_path.rsplit("/")[-1][1:20]
                     print("path from watchdog:" + event.src_path)
                     path = "/".join(event.src_path.rsplit("/")[:-1]) + "/magData"
                     writeLog("Path generated -> " + path)
@@ -393,7 +384,13 @@ class TriggerDirHandler(FileSystemEventHandler):
 
                     # Using venv instead of os.system
                     args = list(command.split(" "))
-                    subprocess.run(args)
+                    result = subprocess.run(args)
+                    if result.returncode != 0:
+                        writeLog(
+                            "ERROR: psws_addMAG failed with return code "
+                            + str(result.returncode)
+                        )
+                        return
 
                     try:
                         scripts_root = Path(__file__).resolve().parents[1]
