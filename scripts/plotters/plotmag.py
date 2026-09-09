@@ -6,7 +6,6 @@
 #
 # The full license is in the LICENSE file, distributed with this software.
 # ----------------------------------------------------------------------------
-from _bootstrap_django import bootstrap
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -23,6 +22,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
+from _bootstrap_django import bootstrap
 
 env_path = Path(__file__).resolve().parent.parent / "scripts.env"
 load_dotenv(dotenv_path=env_path)
@@ -226,7 +226,7 @@ def plot_magnetometer(path, station, date, lat, lon, grid, nick, instrument_id):
                 theObsQS = Observation.objects.filter(
                     station_id=station_id,
                     instrument_id=instrumentID,
-                    fileName=actual_filename,
+                    fileName=filename,
                 )
 
                 if theObsQS.exists():
@@ -242,14 +242,17 @@ def plot_magnetometer(path, station, date, lat, lon, grid, nick, instrument_id):
                     writeLog("Database update successful")
                 else:
                     writeLog(
-                        f"WARNING: No observation found for station {station_id}, "
-                        f"instrument {instrumentID}, file {actual_filename}"
+                        f"ERROR: No observation found for station {station_id}, "
+                        f"instrument {instrumentID}, file {filename}"
                     )
+                    return None
             else:
-                writeLog(f"WARNING: Station {stationIDstr} not found in database")
+                writeLog(f"ERROR: Station {stationIDstr} not found in database")
+                return None
 
         except Exception as e:
             writeLog(f"ERROR updating database: {str(e)}")
+            return None
 
         return output_full_path
 

@@ -14,6 +14,12 @@ from urllib.parse import quote_plus
 
 import os, sys, time
 from pathlib import Path
+from dotenv import load_dotenv
+
+SCRIPTS_ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(SCRIPTS_ROOT / "scripts.env")
+MAG_PYTHON = os.getenv("PYTHON_EXECUTABLE", sys.executable)
+MAG_INGEST = Path(os.getenv("BASE_PATH_INGEST", str(SCRIPTS_ROOT / "ingest"))) / "psws_addMAG.py"
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers.polling import PollingObserver  # <- polling, not inotify
 
@@ -368,23 +374,13 @@ class TriggerDirHandler(FileSystemEventHandler):
 
                     # Make sure to use the correct virtual environment here; needs to match
                     #  what is in /etc/systemd/system/watchX.service
-                    command = (
-                        "/opt/venv311/bin/python3 /var/www/html/psws_addMAG.py "
-                        + path
-                        + " "
-                        + station_id
-                        + " "
-                        + instrumentNo
-                        + " "
-                        + endDate
-                    )
-                    print("Issuing command: " + command)
-                    # os.system(command)
-                    writeLog("Issued syscommand:" + command)
-
-                    # Using venv instead of os.system
-                    args = list(command.split(" "))
-                    result = subprocess.run(args)
+                    args = [MAG_PYTHON, str(MAG_INGEST), path,
+                            station_id, instrumentNo, endDate]
+                    try:
+                        result = subprocess.run(args, timeout=300)
+                    except (OSError, subprocess.TimeoutExpired) as ex:
+                        writeLog(f"ERROR: psws_addMAG could not complete: {ex}")
+                        return
                     if result.returncode != 0:
                         writeLog(
                             "ERROR: psws_addMAG failed with return code "
@@ -439,7 +435,7 @@ class TriggerDirHandler(FileSystemEventHandler):
                                     else:
                                         date_str = endDate[0:10]
                                 plot_cmd = [
-                                    "/opt/venv311/bin/python3",
+                                    MAG_PYTHON,
                                     plotmag_script,
                                     fpath,
                                     "--station",
@@ -467,15 +463,17 @@ class TriggerDirHandler(FileSystemEventHandler):
                                     + " (location details redacted)"
                                 )
                                 result = subprocess.run(
-                                    plot_cmd, capture_output=True, text=True
+                                    plot_cmd, capture_output=True, text=True, timeout=300
                                 )
                                 if result.returncode != 0:
                                     writeLog("Plotting failed: " + result.stderr)
+                                    return
                                 else:
                                     writeLog("Plotting successful: " + result.stdout)
                     except Exception as ex:
-                        print("Exception: ", str(ex))
-                        writeLog("Exception during magnetometer plotting: " + str(ex))
+                        # Exceptions may include the command and coordinates.
+                        writeLog("Exception during magnetometer plotting: " + type(ex).__name__)
+                        return
 
                     fix_permissions(path)
 
