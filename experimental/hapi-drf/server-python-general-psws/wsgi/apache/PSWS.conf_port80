@@ -1,0 +1,42 @@
+<VirtualHost *:80>
+    ServerName pswsnetwork.eng.ua.edu
+    ServerAlias www.pswsnetwork.eng.ua.edu
+    # Project path and WSGI entry point
+#    WSGIDaemonProcess PSWS python-home=/var/www/html/PSWS/venv311 python-path=/var/www/html/PSWS
+    WSGIDaemonProcess PSWS python-home=/opt/venv311 python-path=/var/www/html/PSWS
+    WSGIProcessGroup PSWS
+    WSGIScriptAlias / /var/www/html/PSWS/PSWS/wsgi.py
+
+    # For debugging (WDE)
+
+    WSGIImportScript /var/www/html/PSWS/PSWS/wsgi.py process-group=PSWS application-group=%{GLOBAL}
+
+    <Directory /var/www/html/PSWS/PSWS>
+        <Files wsgi.py>
+            Require all granted
+        </Files>
+    </Directory>
+
+    # Static files
+# original:
+     Alias /static/ /var/www/html/PSWS/static/
+    <Directory /var/www/html/PSWS/static>
+        Require all granted
+    </Directory>
+
+#    Alias /static/ /psws/psws/static/
+#    <Directory /psws/psws/static>
+#        Require all granted
+#    </Directory>
+
+    # Media files (optional)
+     Alias /media/ /psws/psws/media/
+#    Alias /media/ /var/www/html/PSWS/media/
+#    <Directory /var/www/html/PSWS/media>
+    <Directory /psws/psws/media> 
+       Require all granted
+    </Directory>
+
+    ErrorLog /var/log/httpd/psws-error.log
+    CustomLog /var/log/httpd/psws-access.log combined
+</VirtualHost>

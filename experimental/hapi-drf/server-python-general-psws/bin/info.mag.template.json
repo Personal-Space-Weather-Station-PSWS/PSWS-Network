@@ -1,0 +1,74 @@
+{
+  "HAPI": "3.3",
+  "status": {
+    "code": 1200,
+    "message": "OK"
+  },
+  "startDate": null,
+  "stopDate": null,
+  "timeStampLocation": "?begin",
+  "cadence": "PT1S",
+  "maxRequestDuration": "P30D",
+  "description": "?Magnetometer data from Raspberry-Pi RM3100 Magnetometer. See also https://hamsci.org/mag_install",
+  "resourceURL": "https://pswsnetwork.eng.ua.edu/",
+  "citation": "https://pswsnetwork.eng.ua.edu/",
+  "contact": "bill.engelke@ua.edu",
+  "geoLocation": null,
+  "parameters": [
+    {
+      "name": "Time",
+      "type": "isotime",
+      "length": 20,
+      "units": "UTC",
+      "description": "UTC date/time",
+      "fill": null
+    },
+    {
+      "name": "Field_Vector",
+      "type": "double",
+      "size": [3],
+      "units": "nT",
+      "label": ["Bx", "By", "Bz"],
+      "vectorComponents": ["x", "y", "z"],
+      "description": "?Magnetic field vector components. X is generally local geomagnetic north and y geomagnetic east at the time of installation; z is vertical (down)",
+      "fill": "99999.0"
+    },
+    {
+      "name": "rxryrz",
+      "type": "integer",
+      "size": [3],
+      "units": "nT",
+      "label": ["Brx", "Bry", "Brz"],
+      "coordinateSystemName": "GEO",
+      "vectorComponents": ["x", "y", "z"],
+      "description": "?",
+      "fill": "99999.0"
+    },
+    {
+      "name": "rtlt",
+      "type": "double",
+      "size": [3],
+      "units": "?",
+      "label": ["rt", "lt"],
+      "description": "?",
+      "fill": "99999.0"
+    },
+    {
+      "name": "rtlt",
+      "type": "double",
+      "size": [2],
+      "units": null,
+      "label": ["rt", "lt"],
+      "description": "?",
+      "fill": "99999.0"
+    },
+    {
+      "name": "Tm",
+      "type": "double",
+      "units": "F",
+      "label": "Tm",
+      "description": "Remote temperature (?)",
+      "fill": "99999.0"
+    }
+  ]
+}
