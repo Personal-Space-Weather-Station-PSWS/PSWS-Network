@@ -87,7 +87,8 @@ def observations_needed(station_dir, start, stop):
 
   with entries:
     for entry in entries:
-      if not entry.is_dir(follow_symlinks=False):
+      # Observation directories may be symlinks to DRF storage - WDE
+      if not entry.is_dir(follow_symlinks=True):
         continue
       obs_start = _observation_start(entry.name)
       if obs_start is None:
