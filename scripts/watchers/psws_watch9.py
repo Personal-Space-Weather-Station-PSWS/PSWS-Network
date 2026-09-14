@@ -14,12 +14,9 @@ from urllib.parse import quote_plus
 
 import os, sys, time
 from pathlib import Path
-from dotenv import load_dotenv
 
-SCRIPTS_ROOT = Path(__file__).resolve().parents[1]
-load_dotenv(SCRIPTS_ROOT / "scripts.env")
-MAG_PYTHON = os.getenv("PYTHON_EXECUTABLE", sys.executable)
-MAG_INGEST = Path(os.getenv("BASE_PATH_INGEST", str(SCRIPTS_ROOT / "ingest"))) / "psws_addMAG.py"
+MAG_PYTHON = "/srv/PSWS-Network/venv312/bin/python3"
+MAG_INGEST = "/srv/PSWS-Network/scripts/ingest/psws_addMAG.py"
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers.polling import PollingObserver  # <- polling, not inotify
 
@@ -462,12 +459,23 @@ class TriggerDirHandler(FileSystemEventHandler):
                                     + date_str
                                     + " (location details redacted)"
                                 )
-                                result = subprocess.run(
-                                    plot_cmd, capture_output=True, text=True, timeout=300
-                                )
+                                try:
+                                    result = subprocess.run(
+                                        plot_cmd, capture_output=True, text=True, timeout=300
+                                    )
+                                except (OSError, subprocess.TimeoutExpired) as ex:
+                                    writeLog(
+                                        f"ERROR: Plotting failed for {fpath}: "
+                                        f"{type(ex).__name__}; continuing with remaining files"
+                                    )
+                                    continue
                                 if result.returncode != 0:
-                                    writeLog("Plotting failed: " + result.stderr)
-                                    return
+                                    writeLog(
+                                        f"ERROR: Plotting failed for {fpath} "
+                                        f"(exit {result.returncode}): {result.stderr}; "
+                                        "continuing with remaining files"
+                                    )
+                                    continue
                                 else:
                                     writeLog("Plotting successful: " + result.stdout)
                     except Exception as ex:

@@ -6,51 +6,56 @@
 #
 # The full license is in the LICENSE file, distributed with this software.
 # ----------------------------------------------------------------------------
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import matplotlib.ticker as ticker
 import sys
 import argparse
 import os
 from datetime import datetime, timezone
 import zipfile
 from io import BytesIO
-from dotenv import load_dotenv
-
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT))
-from _bootstrap_django import bootstrap
-
-env_path = Path(__file__).resolve().parent.parent / "scripts.env"
-load_dotenv(dotenv_path=env_path)
-# Django bootstrap to set up environment for Database access
-bootstrap()
-
-PLOT_PATH = os.getenv("PLOT_PATH")
-LOG_PATH = os.getenv("LOG_PATH")
-
-if not PLOT_PATH:
-    raise EnvironmentError("PLOT_PATH not set in scripts.env")
-if not LOG_PATH:
-    raise EnvironmentError("LOG_PATH not set in scripts.env")
+PLOT_PATH = "/psws/psws/media/plots"
+LOG_PATH = "/var/log/watchdog/watchdog.log"
 
 plot_output_path = PLOT_PATH
 
 
 def writeLog(theMessage):
-    log_dir = os.path.dirname(LOG_PATH)
-    if log_dir:
-        os.makedirs(log_dir, exist_ok=True)
-    else:
-        raise ValueError("LOG_PATH must include a directory")
-
     timestamp = datetime.now(timezone.utc).isoformat()
+    message = f"{timestamp} {theMessage}\n"
 
-    with open(LOG_PATH, "a", encoding="utf-8") as f:
-        f.write(f"{timestamp} {theMessage}\n")
+    try:
+        log_dir = os.path.dirname(LOG_PATH)
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+        with open(LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(message)
+    except OSError as e:
+        print(f"LOGGING ERROR: {e}; original message: {theMessage}", file=sys.stderr)
+
+
+PLOT_SETUP_ERROR = None
+
+try:
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import matplotlib.dates as mdates
+    import matplotlib.ticker as ticker
+except Exception as e:
+    PLOT_SETUP_ERROR = e
+    writeLog(f"ERROR importing plotting dependencies: {type(e).__name__}: {e}")
+
+try:
+    REPO_ROOT = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(REPO_ROOT))
+    from _bootstrap_django import bootstrap
+
+    # Django bootstrap to set up environment for Database access
+    bootstrap()
+except Exception as e:
+    if PLOT_SETUP_ERROR is None:
+        PLOT_SETUP_ERROR = e
+    writeLog(f"ERROR setting up Django for plotmag: {type(e).__name__}: {e}")
 
 
 def open_maybe_zip(path):
@@ -79,8 +84,15 @@ def load_dataframe(path):
         bx, by, bz = "x", "y", "z"
     else:
         names = ["ts", "rt", "lt", "x", "y", "z", "rx", "ry", "rz", "Tm"]
-        # Handle quoted CSV values with quotechar parameter
-        df = pd.read_csv(f, names=names, quotechar='"', skipinitialspace=True)
+        first_line = f.readline().decode("utf-8", errors="ignore").strip()
+        f.seek(0)
+
+        # Converted CSV files include a header and only the columns ts,rt,x,y,z.
+        # Raw CSV-like files have no header and use the full names list above.
+        if first_line.lower().startswith("ts,"):
+            df = pd.read_csv(f, quotechar='"', skipinitialspace=True)
+        else:
+            df = pd.read_csv(f, names=names, quotechar='"', skipinitialspace=True)
         bx, by, bz = "x", "y", "z"
 
     return df, inner_name, bx, by, bz
@@ -103,19 +115,50 @@ def plot_magnetometer(path, station, date, lat, lon, grid, nick, instrument_id):
     Returns:
         output_full_path: Path to generated plot file, or None on error
     """
-    from apps.stations.models import Station
-    from apps.observations.models import Observation
-
     try:
         writeLog(f"plot_magnetometer called for station {station}, file {path}")
+
+        if PLOT_SETUP_ERROR is not None:
+            writeLog(
+                "ERROR: plotmag setup failed before plotting: "
+                f"{type(PLOT_SETUP_ERROR).__name__}: {PLOT_SETUP_ERROR}"
+            )
+            return None
+
+        from apps.stations.models import Station
+        from apps.instruments.models import Instrument
+        from apps.observations.models import Observation
 
         os.makedirs(plot_output_path, exist_ok=True)
 
         stationIDstr = station
-        instrumentID = instrument_id
         filename = os.path.basename(path)
 
-        df, actual_filename, bx, by, bz = load_dataframe(path)
+        station_obj = Station.objects.filter(station_id=stationIDstr).first()
+        if not station_obj:
+            writeLog(f"ERROR: Station {stationIDstr} not found in database")
+            return None
+
+        if str(instrument_id).isdigit():
+            instrument_obj = Instrument.objects.filter(
+                id=int(instrument_id), station_id=station_obj.id
+            ).first()
+        else:
+            instrument_obj = Instrument.objects.filter(
+                instrument=instrument_id, station_id=station_obj.id
+            ).first()
+
+        if not instrument_obj:
+            writeLog(
+                f"ERROR: Instrument {instrument_id} not found for station {stationIDstr}"
+            )
+            return None
+
+        # Use the database primary key for filenames and Observation lookups, matching
+        # the other plotters and psws_addMAG.py's instrument resolution behavior.
+        instrumentID = str(instrument_obj.id)
+
+        df, _actual_filename, bx, by, bz = load_dataframe(path)
         parse_success = False
 
         if isinstance(df["ts"].iloc[0], str):
@@ -143,12 +186,17 @@ def plot_magnetometer(path, station, date, lat, lon, grid, nick, instrument_id):
 
         df = df.set_index("ts")
 
+        # Resample only magnetometer numeric columns. The raw dataframe also contains
+        # non-numeric fields such as rt/lt, which cause pandas 2.x resample().mean()
+        # to fail with TypeError unless excluded.
+        df_mag = df[[bx, by, bz]].apply(pd.to_numeric, errors="coerce")
+
         writeLog(
-            f"NaN counts before resampling - x: {df[bx].isna().sum()}, "
-            f"y: {df[by].isna().sum()}, z: {df[bz].isna().sum()}"
+            f"NaN counts before resampling - x: {df_mag[bx].isna().sum()}, "
+            f"y: {df_mag[by].isna().sum()}, z: {df_mag[bz].isna().sum()}"
         )
 
-        df_avg = df.resample("10min").mean()
+        df_avg = df_mag.resample("10min").mean()
 
         writeLog(f"After resampling (before dropna): {len(df_avg)} rows")
         writeLog(
@@ -219,35 +267,28 @@ def plot_magnetometer(path, station, date, lat, lon, grid, nick, instrument_id):
                 f"instrument {instrumentID}, file {filename}"
             )
 
-            theStationQS = Station.objects.filter(station_id=stationIDstr)
-            if theStationQS.exists():
-                station_id = theStationQS.values()[0]["id"]
+            theObsQS = Observation.objects.filter(
+                station_id=station_obj.id,
+                instrument_id=instrumentID,
+                fileName=filename,
+            )
 
-                theObsQS = Observation.objects.filter(
-                    station_id=station_id,
-                    instrument_id=instrumentID,
-                    fileName=filename,
+            if theObsQS.exists():
+                writeLog(
+                    f"Updating observation with plot at: "
+                    f"{plot_output_path}/{output_filename}"
                 )
-
-                if theObsQS.exists():
-                    writeLog(
-                        f"Updating observation with plot at: "
-                        f"{plot_output_path}/{output_filename}"
-                    )
-                    obs_id = theObsQS.values()[0]["id"]
-                    obs_instance = Observation.objects.get(id=obs_id)
-                    obs_instance.plotFile = output_filename
-                    obs_instance.plotPath = plot_output_path
-                    obs_instance.save()
-                    writeLog("Database update successful")
-                else:
-                    writeLog(
-                        f"ERROR: No observation found for station {station_id}, "
-                        f"instrument {instrumentID}, file {filename}"
-                    )
-                    return None
+                obs_id = theObsQS.values()[0]["id"]
+                obs_instance = Observation.objects.get(id=obs_id)
+                obs_instance.plotFile = output_filename
+                obs_instance.plotPath = plot_output_path
+                obs_instance.save()
+                writeLog("Database update successful")
             else:
-                writeLog(f"ERROR: Station {stationIDstr} not found in database")
+                writeLog(
+                    f"ERROR: No observation found for station {station_obj.id}, "
+                    f"instrument {instrumentID}, file {filename}"
+                )
                 return None
 
         except Exception as e:
