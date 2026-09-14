@@ -30,6 +30,31 @@ ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else "/home")
 # d - future item for data request (not yet implemented)
 
 TRIGGER_NAMES = {"m", "t", "g", "c", "m_Test"}
+TRIGGER_TIMESTAMP_SUFFIX_RE = re.compile(
+    r"_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}|\d{14}|\d{8}(?:T\d{6})?)$"
+)
+
+
+def parse_instrument_from_trigger(trigger_path):
+    """Return (instrument_id, timestamp_suffix) from a trigger directory path."""
+    leaf = os.path.basename(trigger_path)
+    instrument_part = leaf.split("_#", 1)[1]
+    match = TRIGGER_TIMESTAMP_SUFFIX_RE.search(instrument_part)
+    if match:
+        return instrument_part[: match.start()], match.group(1)
+    return instrument_part, None
+
+
+def normalize_mag_timestamp(timestamp):
+    """Convert recognized compact trigger timestamps to psws_addMAG format."""
+    if not timestamp:
+        return None
+    for fmt in ("%Y-%m-%dT%H:%M", "%Y%m%d%H%M%S", "%Y%m%dT%H%M%S", "%Y%m%d"):
+        try:
+            return dt.strptime(timestamp, fmt).strftime("%Y-%m-%dT%H:%M")
+        except ValueError:
+            continue
+    return timestamp
 
 """
 def writeLog(msg):
@@ -109,13 +134,11 @@ class TriggerDirHandler(FileSystemEventHandler):
 
                 # Now we have trigger directory; does it contain an instrument number?
                 try:
-                    instrumentNo = event.src_path.split("_#")[
-                        1
-                    ]  # this should be instrument_>
-                    writeLog(
-                        "Instrument number found at -> " + event.src_path.split("_#")[1]
+                    instrumentNo, upload_timestamp = parse_instrument_from_trigger(
+                        event.src_path
                     )
-                except:
+                    writeLog("Instrument number found at -> " + instrumentNo)
+                except (IndexError, ValueError):
                     print("ERROR, parsing failure, the '_#' not found")
                     writeLog("ERROR - parsing failure, the '_#' not found")
                     return
@@ -358,9 +381,10 @@ class TriggerDirHandler(FileSystemEventHandler):
                     writeLog("Path generated -> " + path)
                     obsSize = get_size(path)
                     station_id = path.rsplit("/")[-2]
-                    endDate = event.src_path[
-                        -16:
-                    ]  # get the last 16 char of the trigger, this is timestamp of the upload
+                    endDate = (
+                        normalize_mag_timestamp(upload_timestamp)
+                        or event.src_path[-16:]
+                    )  # get the last 16 char of the trigger, this is timestamp of the upload
                     print("path=" + path + " station_id=" + station_id)
 
                     # Assumptions
