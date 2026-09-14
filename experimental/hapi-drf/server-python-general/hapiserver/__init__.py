@@ -27,8 +27,8 @@ def main():
   import hapiserver
   import utilrsw.uvicorn
 
-  config = hapiserver.cli()
+  configs = hapiserver.cli()
 
-  at = "http://{configs['server']['--host']}:{configs['server']['--port']}/hapi"
+  at = f"http://{configs['server']['--host']}:{configs['server']['--port']}/hapi"
   print(f"Starting HAPI server using Uvicorn at {at}")
-  utilrsw.uvicorn.run("hapiserver.app", config)
+  utilrsw.uvicorn.run("hapiserver.app", configs)
