@@ -27,12 +27,12 @@ def error(error, config, message=None):
     }
   }
 
-  if error['code'] >= 1400 and error['code'] <= 1499:
+  status_code = 500
+  if 1400 <= error['code'] <= 1499:
     status_code = 400
-  if error['code'] >= 1500 and error['code'] <= 1599:
+  elif 1500 <= error['code'] <= 1599:
     status_code = 500
-  if error['code'] == 1500:
-    status_code = 500
+
   if error['code'] == 1501:
     status_code = 501
 
