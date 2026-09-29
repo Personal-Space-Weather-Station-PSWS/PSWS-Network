@@ -1,0 +1,22 @@
+{
+  "path": "/hapi",
+  "scripts": {
+    "catalog": "$PSWS_BIN_DIR/catalog.py",
+    "info": "$PSWS_BIN_DIR/info.py",
+    "data": "$PSWS_BIN_DIR/data.py"
+  },
+  "xstream": {
+    "stderr": true,
+    "chunk_size": 1000000
+  },
+  "ENV": {
+    "PSWS_BIN_DIR": "/srv/hapi/server-python-general-psws/bin",
+    "PSWS_DATA_DIR": "/srv/hapi/server-python-general-psws/data"
+  },
+  "about": {
+    "id": "PSWS",
+    "title": "PSWS HAPI Server",
+    "HAPI": "3.3",
+    "contact": "wdengelke@retiree.ua.edu"
+  }
+}

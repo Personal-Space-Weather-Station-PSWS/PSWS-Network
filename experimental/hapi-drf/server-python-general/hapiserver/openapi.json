@@ -1,0 +1,201 @@
+{
+  "openapi": "3.0.2",
+  "info": {
+    "title": "HAPI Server API",
+    "description": "HAPI (Heliophysics Application Programmer's Interface) Server for accessing time series data. The HAPI specification provides a simple web API for accessing time series data. This server implementation provides endpoints for discovering available datasets, getting metadata about parameters, and retrieving data.",
+    "contact": {
+      "name": "HAPI Server Support",
+      "url": "https://github.com/hapi-server/server-python-general"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    },
+    "version": "3.3"
+  },
+  "paths": {
+    "/hapi": {
+      "get": {
+        "tags": [
+          "Root"
+        ],
+        "summary": "Landing page",
+        "description": "Returns HTML landing page with server information and available endpoints",
+        "operationId": "hapi_index",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hapi/about": {
+      "get": {
+        "tags": [
+          "Metadata"
+        ],
+        "summary": "Get server information",
+        "description": "Returns information about the HAPI server, including version and contact details.",
+        "operationId": "catalog_hapi_about_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hapi/catalog": {
+      "get": {
+        "tags": [
+          "Metadata"
+        ],
+        "summary": "Get list of available datasets",
+        "description": "Returns a list of datasets available from this HAPI server. Each dataset has an ID that can be used in subsequent info and data requests.",
+        "operationId": "catalog_hapi_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hapi/info": {
+      "get": {
+        "tags": [
+          "Metadata"
+        ],
+        "summary": "Get dataset metadata",
+        "description": "Returns metadata about a specific dataset, including parameter definitions, time range, and other dataset properties.",
+        "operationId": "info_hapi_info_get",
+        "parameters": [
+          {
+            "description": "Dataset identifier from the catalog",
+            "required": true,
+            "schema": {
+              "title": "Dataset",
+              "type": "string",
+              "description": "Dataset identifier from the catalog"
+            },
+            "name": "dataset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hapi/data": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Get time series data",
+        "description": "Returns time series data for the specified dataset and time range. Data is returned in CSV format by default.",
+        "operationId": "data_hapi_data_get",
+        "parameters": [
+          {
+            "description": "Dataset identifier from the catalog",
+            "required": true,
+            "schema": {
+              "title": "Dataset",
+              "type": "string",
+              "description": "Dataset identifier from the catalog"
+            },
+            "name": "dataset",
+            "in": "query"
+          },
+          {
+            "description": "Start time in ISO 8601 format",
+            "required": true,
+            "schema": {
+              "title": "Start",
+              "type": "string",
+              "description": "Start time in ISO 8601 format"
+            },
+            "name": "start",
+            "in": "query"
+          },
+          {
+            "description": "Stop time in ISO 8601 format",
+            "required": true,
+            "schema": {
+              "title": "Stop",
+              "type": "string",
+              "description": "Stop time in ISO 8601 format"
+            },
+            "name": "stop",
+            "in": "query"
+          },
+          {
+            "description": "Comma-separated list of parameter names to include (default is all parameters)",
+            "required": false,
+            "schema": {
+              "title": "Parameters",
+              "type": "string",
+              "description": "Comma-separated list of parameter names to include (default is all parameters)"
+            },
+            "name": "parameters",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

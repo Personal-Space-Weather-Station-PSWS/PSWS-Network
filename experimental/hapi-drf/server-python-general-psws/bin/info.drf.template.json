@@ -1,0 +1,45 @@
+{
+  "HAPI": "3.3",
+  "status": {
+    "code": 1200,
+    "message": "OK"
+  },
+  "startDate": null,
+  "stopDate": null,
+  "timeStampLocation": "begin",
+  "cadence": "P1D",
+  "maxRequestDuration": "P1D",
+  "description": "PSWS native Digital RF (DRF) Observations. The standard CSV representation is an Observation manifest. Requesting format=x_drf_zip returns every complete native Observation whose approximately 24-hour interval overlaps the requested HAPI time interval. DRF Observations are not time-sliced and individual subchannels are not extracted by the server; users select subchannels after download with Digital RF software.",
+  "resourceURL": "https://pswsnetwork.eng.ua.edu/",
+  "citation": "https://pswsnetwork.eng.ua.edu/",
+  "contact": "wdengelke@retiree.ua.edu",
+  "geoLocation": null,
+  "x_psws": {
+    "dataFormat": "Digital RF",
+    "nativeObject": "Observation directory tree",
+    "observationDuration": "P1D",
+    "nativeOutputFormat": "x_drf_zip",
+    "nativeTransport": "ZIP",
+    "nativeSelection": "complete Observations overlapping the requested interval",
+    "subchannelSelection": "client-side after download",
+    "nativeFormatIgnoresParameters": true
+  },
+  "parameters": [
+    {
+      "name": "Time",
+      "type": "isotime",
+      "length": 20,
+      "units": "UTC",
+      "description": "Start time encoded in the native OBS... directory name",
+      "fill": null
+    },
+    {
+      "name": "Observation",
+      "type": "string",
+      "length": 32,
+      "units": null,
+      "description": "Native Digital RF Observation directory name, for example OBS2026-08-27T00-01",
+      "fill": ""
+    }
+  ]
+}

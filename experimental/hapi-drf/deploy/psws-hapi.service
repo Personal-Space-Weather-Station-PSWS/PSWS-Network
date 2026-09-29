@@ -1,0 +1,34 @@
+
+[Unit]
+Description=PSWS HAPI API (Gunicorn ASGI)
+After=network.target
+
+[Service]
+Type=simple
+User=hapi
+Group=hapi
+WorkingDirectory=/srv/hapi
+
+Environment="PATH=/srv/hapi/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+
+ExecStartPre=/usr/bin/test -r /srv/hapi/server-python-general-psws/config.json
+
+ExecStart=/srv/hapi/venv/bin/hapiserver \
+    --config /srv/hapi/server-python-general-psws/config.json \
+    --host 127.0.0.1 \
+    --port 8081
+
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillMode=mixed
+
+# Basic hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

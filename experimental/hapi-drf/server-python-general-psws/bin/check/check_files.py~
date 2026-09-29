@@ -1,0 +1,304 @@
+import os
+from pathlib import Path
+
+# Try to read all files
+# For debugging - print first two lines of each file only
+print_first_lines = False
+
+# Get all files in ../data/*/magData directories
+#data_dir = Path(os.path.join(os.path.dirname(__file__), '..', 'data'))
+data_dir = Path('data2/psws/home_filtered')
+#data_dir = Path('/Volumes/WDMyPassport5TB-2/psws/home_filtered')
+
+def xprint(msg):
+  print(msg)
+  print(msg, file=log_file)
+
+def error(line, line_no, emsg=None, e=None):
+  xprint("    Error:")
+  xprint(f"      Line {line_no}: {line}")
+  if emsg:
+    xprint(f"      Problem: {emsg}")
+  if e:
+      xprint(f"      Error: {e}")
+
+
+def files(data_type):
+  all_files = {}
+
+  if data_type == 'mag':
+    sub_dir = 'magData'
+    ext = '.zip'
+  if data_type == 'doppler':
+    sub_dir = 'csvData'
+    ext = '.csv'
+
+  for dir_name in data_dir.iterdir():
+    if dir_name.is_dir():
+      all_files[dir_name.name] = {}
+
+      mag_data_dir = dir_name / sub_dir
+      n_files = len(list((mag_data_dir).glob(f'*{ext}')))
+      xprint(f"{dir_name.name}/{sub_dir} has {n_files} {ext} files")
+
+      if not mag_data_dir.exists() or not mag_data_dir.is_dir():
+        continue
+      files = []
+      for f in mag_data_dir.iterdir():
+        if f.is_file() and f.name.endswith(ext):
+          files.append(str(f.relative_to(data_dir)))
+      files.sort()
+      all_files[dir_name.name] = files
+
+  return all_files
+
+def read_doppler(filepath):
+  import pandas as pd
+
+  # Read the file to check basic info
+  with open(filepath, 'r') as f:
+    lines = f.readlines()
+
+  xprint(f"    # of lines: {len(lines)}")
+  if len(lines) == 0:
+    error(None, -1, "File is empty")
+    return pd.DataFrame()  # Return empty DataFrame for empty files
+  xprint(f"    first line: {lines[0].strip()}")
+  xprint(f"    last line:  {lines[-1].strip()}")
+
+  # Read CSV file with pandas, skipping comment lines that start with #
+  df = pd.read_csv(filepath, comment='#', skipinitialspace=True)
+
+  # Convert UTC column to datetime and set as index
+  if 'UTC' in df.columns:
+    df['UTC'] = pd.to_datetime(df['UTC'])
+    df.set_index('UTC', inplace=True)
+
+  return df
+
+
+def read_mag(filepath):
+
+  import re
+  import sys
+  import json
+  import zipfile
+  import datetime
+
+  import pandas as pd
+
+  debug = False
+
+  def extract_data(file):
+    """Read files in a zip file into a string"""
+    data = ""
+    with zipfile.ZipFile(file, 'r') as z:
+      for filename in sorted(z.namelist()):
+        with z.open(filename) as f:
+          data += f.read().decode('utf-8')
+    return data
+
+  # TODO: This will be much faster if CSV files were read using Pandas, which
+  # loops over lines in c code.
+  data = extract_data(filepath)
+
+  line_no = 0
+  xprint(f"    # of lines: {len(data.splitlines())}")
+  if len(data.splitlines()) == 0:
+    error(None, -1, "File is empty")
+    return pd.DataFrame()  # Return empty DataFrame for empty files
+  xprint(f"    first line: {data.splitlines()[0]}")
+  xprint(f"    last line:  {data.splitlines()[-1]}")
+  format = None
+
+  format_last = None
+  rows = []
+  for line in data.splitlines():
+
+    line_no += 1
+    if debug:
+      xprint(f"Debug: Processing line: {line}", file=sys.stderr)
+
+    if line.startswith('{'):
+      format = 1
+      if format != format_last and format_last is not None:
+        error(line, line_no, "Row format on this line does not match previous.")
+        break
+      format_last = 1
+      # Row format:
+      # {'ts': '21 Oct 2025 04:01:59', 'rt': 32.5, 'lt': 41.69,
+      #  'x': -45676.67, 'y': -13284.67, 'z': 16150.67,
+      #  'rx': -68515, 'ry': -19927, 'rz': 24226, 'Tm': 50236.2845}
+      entry = json.loads(line)
+      if len(entry) != 10:
+        error(line, line_no, "Number of fields != 10 for JSON row format.")
+        break
+
+      ts = entry['ts']
+      try:
+        dt = datetime.datetime.strptime(ts, '%d %b %Y %H:%M:%S')
+        entry['ts'] = dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+      except Exception as e:
+        error(line, line_no, "Failed to parse time value", e)
+        break
+
+    elif re.match(r'^"\d', line):
+      # Row format:
+      # TODO: Verify that these columns are correct.
+      entry = line.split(', ')
+
+      if len(entry) == 9:
+        format = 2
+      if len(entry) == 10:
+        format = 3
+      if format != format_last and format_last is not None:
+        error(line, line_no, "Row format on this line does not match previous.")
+        break
+      format_last = format
+
+      ts = entry[0].strip('"')
+      try:
+        dt = datetime.datetime.strptime(ts, '%d %b %Y %H:%M:%S')
+      except Exception as e:
+        error(line, line_no, "Failed to parse time value", e)
+        break
+
+      if format == 2:
+        entry = {
+          'ts': dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
+          'x': float(entry[1]),
+          'y': float(entry[2]),
+          'z': float(entry[3]),
+          'rx': float(entry[4]),
+          'ry': float(entry[5]),
+          'rz': float(entry[6]),
+          'rt': float(entry[7]),
+          'lt': float(entry[8]),
+          'Tm': -9999999
+        }
+
+      if format == 3:
+        entry = {
+          'ts': dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
+          'x': float(entry[1]),
+          'y': float(entry[2]),
+          'z': float(entry[3]),
+          'rx': float(entry[4]),
+          'ry': float(entry[5]),
+          'rz': float(entry[6]),
+          'rt': float(entry[7]),
+          'lt': float(entry[8]),
+          'Tm': float(entry[9]),
+        }
+    else:
+      error(line, line_no, "Non-data line")
+      break
+
+    row = entry['ts']
+
+    row = [
+            entry['ts'], entry['x'], entry['y'], entry['z'],
+            entry['rx'], entry['ry'], entry['rz'],
+            entry['rt'], entry['lt'], entry['Tm']
+          ]
+
+    rows.append(row)
+
+  # Create DataFrame from list of lists with time as index
+  columns = ['time', 'x', 'y', 'z', 'rx', 'ry', 'rz', 'rt', 'lt', 'Tm']
+  df = pd.DataFrame(rows, columns=columns)
+  df['time'] = pd.to_datetime(df['time'])
+  df.set_index('time', inplace=True)
+
+  # Check that time is monotonically increasing
+  if not df.index.is_monotonic_increasing:
+    error(None, -1, "Time values are not monotonically increasing")
+
+  return df
+
+
+def check_times(df, df_last, file_date):
+  # Check that date in time column of df matches date in file name
+  if not df.empty:
+    df_date = df.index[0].strftime('%Y-%m-%d')
+    if not df_date.startswith(file_date):
+      error(None, -1, "Date in file name does not match date in time column")
+      error(None, -1, f"  Date in file name: {file_date}")
+      error(None, -1, f"  Date in time column: {df_date}")
+
+  if df_last is not None:
+    if not df.index.is_monotonic_increasing:
+      if df.index[0] <= df_last.index[-1]:
+        xprint("  Warning: Time values are not strictly increasing across files")
+        xprint(f"  Last timestamp of previous file: {df_last.index[-1]}")
+        xprint(f"  First timestamp of current file: {df.index[0]}")
+
+
+# Remove previous log file if it exists
+if os.path.exists('files.log'):
+  os.remove('files.log')
+
+# Open log file in append mode
+log_file = open('files.log', 'a')
+
+
+dop_files = files('doppler')
+
+df_last = None
+for dataset in dop_files:
+  xprint(f"Dataset: {dataset}")
+  filepaths = dop_files[dataset]
+
+  # Extract unique parts after 'Z_'
+  unique_suffixes = set()
+  for filepath in filepaths:
+    filename = os.path.basename(filepath)
+    if 'Z_' in filename:
+      suffix = filename.split('Z_', 1)[1]
+      unique_suffixes.add(suffix)
+
+  unique_suffixes = sorted(unique_suffixes)
+  xprint(f"  {len(unique_suffixes)} unique suffixes: {unique_suffixes}")
+
+  for suffix in sorted(unique_suffixes):
+    xprint(f"  * Processing suffix: {suffix}")
+    # Get all files with this suffix
+    matching_files = [fp for fp in filepaths if fp.endswith(suffix)]
+    for filepath in matching_files:
+      xprint(f"  File: {filepath}")
+      try:
+        df = read_doppler(os.path.join(data_dir, filepath))
+      except Exception as e:
+        error(None, -1, "Uncaught read error", e)
+        continue
+
+    file_name = os.path.basename(filepath)
+    file_date = file_name[0:10]
+    check_times(df, df_last, file_date)
+    df_last = df
+
+exit()
+
+mag_files = files('mag')
+df_last = None
+for dataset in mag_files:
+  xprint(f"Dataset: {dataset}")
+  for filepath in mag_files[dataset]:
+
+    xprint(f"  File: {filepath}")
+    try:
+      df = read_mag(os.path.join(data_dir, filepath))
+    except Exception as e:
+      error(None, -1, "Uncaught read error", e)
+      continue
+
+    file_name = os.path.basename(filepath)
+    if not file_name.startswith("OBS"):
+      error(None, -1, "File name does not start with OBS")
+    file_date = file_name[3:12]
+
+    check_times(df, df_last, file_date)
+
+    df_last = df
+
+log_file.close()

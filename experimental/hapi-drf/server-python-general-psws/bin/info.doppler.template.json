@@ -1,0 +1,43 @@
+{
+  "HAPI": "3.3",
+  "status": {
+    "code": 1200,
+    "message": "OK"
+  },
+  "startDate": null,
+  "stopDate": null,
+  "timeStampLocation": "?begin",
+  "cadence": "PT1S",
+  "maxRequestDuration": "P30D",
+  "description": "",
+  "resourceURL": "https://pswsnetwork.eng.ua.edu/",
+  "citation": "https://pswsnetwork.eng.ua.edu/",
+  "contact": "bill.engelke@ua.edu",
+  "geoLocation": null,
+  "parameters": [
+    {
+      "name": "Time",
+      "type": "isotime",
+      "length": 20,
+      "units": "UTC",
+      "description": "UTC date/time",
+      "fill": null
+    },
+    {
+      "name": "Freq",
+      "type": "double",
+      "units": "Hz",
+      "label": "Freq",
+      "description": "",
+      "fill": "99999.0"
+    },
+    {
+      "name": "Vpk",
+      "type": "double",
+      "units": "V",
+      "label": "Vpk",
+      "description": "?",
+      "fill": "99999.0"
+    }
+  ]
+}
