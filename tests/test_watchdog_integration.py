@@ -8,6 +8,8 @@ import pytest
 import os
 import stat
 import subprocess
+import sys
+import types
 import tempfile
 from unittest.mock import patch, MagicMock, ANY
 from pathlib import Path
@@ -113,6 +115,93 @@ class TestContinuousDRFUploadPermissions:
 
 class TestMagnetometerUploadPermissions:
     """Test Magnetometer (m) uploads with permission verification"""
+
+    def test_magnetometer_trigger_runs_ingest_then_plotting(self, tmp_path, monkeypatch):
+        """Exercise the watch9 m-trigger orchestration through ingest and plot calls."""
+        import scripts.watchers.psws_watch9 as watch9
+
+        station_dir = tmp_path / "S000467"
+        mag_dir = station_dir / "magData"
+        mag_dir.mkdir(parents=True)
+        mag_file = mag_dir / "OBS2026-09-14T00:00.zip"
+        mag_file.write_text("mock zip data")
+
+        trigger_dir = station_dir / "mOBS2026-09-14T00-00_#376_#2026-09-29T21:26"
+        trigger_dir.mkdir()
+
+        logs = []
+        monkeypatch.setattr(watch9, "writeLog", logs.append)
+        monkeypatch.setattr(watch9, "MAG_PYTHON", "python-test")
+        monkeypatch.setattr(watch9, "MAG_INGEST", "/ingest/psws_addMAG.py")
+
+        bootstrap_module = types.ModuleType("_bootstrap_django")
+        bootstrap_module.bootstrap = lambda: None
+        monkeypatch.setitem(sys.modules, "_bootstrap_django", bootstrap_module)
+
+        station_obj = types.SimpleNamespace(
+            latitude=33.0,
+            longitude=-87.0,
+            grid="EM63",
+            nickname="TestStation",
+        )
+
+        class FakeStationQuerySet:
+            def first(self):
+                return station_obj
+
+        class FakeStationManager:
+            def filter(self, **kwargs):
+                assert kwargs == {"station_id": "S000467"}
+                return FakeStationQuerySet()
+
+        class FakeStation:
+            objects = FakeStationManager()
+
+        apps_module = types.ModuleType("apps")
+        stations_module = types.ModuleType("apps.stations")
+        station_models_module = types.ModuleType("apps.stations.models")
+        station_models_module.Station = FakeStation
+        monkeypatch.setitem(sys.modules, "apps", apps_module)
+        monkeypatch.setitem(sys.modules, "apps.stations", stations_module)
+        monkeypatch.setitem(sys.modules, "apps.stations.models", station_models_module)
+
+        run_calls = []
+
+        def fake_run(args, *pargs, **kwargs):
+            run_calls.append((args, kwargs))
+            return subprocess.CompletedProcess(args, 0, stdout="ok", stderr="")
+
+        monkeypatch.setattr(watch9.subprocess, "run", fake_run)
+
+        event = MagicMock()
+        event.is_directory = True
+        event.src_path = str(trigger_dir)
+
+        TriggerDirHandler(station_dir).on_created(event)
+
+        assert not trigger_dir.exists()
+        assert run_calls[0][0] == [
+            "python-test",
+            "/ingest/psws_addMAG.py",
+            str(mag_dir),
+            "S000467",
+            "376",
+            "2026-09-29T21:26",
+        ]
+
+        plot_args, plot_kwargs = run_calls[1]
+        assert plot_args[0] == "python-test"
+        assert plot_args[1].endswith("scripts/plotters/plotmag.py")
+        assert plot_args[2] == str(mag_file)
+        assert plot_args[plot_args.index("--station") + 1] == "S000467"
+        assert plot_args[plot_args.index("--date") + 1] == "2026-09-14"
+        assert plot_args[plot_args.index("-i") + 1] == "376"
+        assert all("_#" not in arg for arg in plot_args)
+        assert plot_kwargs["capture_output"] is True
+        assert plot_kwargs["text"] is True
+
+        assert run_calls[2][0] == ["chmod", "-R", "755", str(mag_dir)]
+        assert any("Running plotmag command" in message for message in logs)
     
     @patch('scripts.watchers.psws_watch9.subprocess.run')
     @patch('scripts.watchers.psws_watch9.os.rmdir')
