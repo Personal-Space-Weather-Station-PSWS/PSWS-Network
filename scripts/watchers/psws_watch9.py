@@ -39,6 +39,11 @@ def parse_instrument_from_trigger(trigger_path):
     """Return (instrument_id, timestamp_suffix) from a trigger directory path."""
     leaf = os.path.basename(trigger_path)
     instrument_part = leaf.split("_#", 1)[1]
+
+    if "_#" in instrument_part:
+        instrument_id, timestamp = instrument_part.split("_#", 1)
+        return instrument_id, timestamp or None
+
     match = TRIGGER_TIMESTAMP_SUFFIX_RE.search(instrument_part)
     if match:
         return instrument_part[: match.start()], match.group(1)
