@@ -12,10 +12,12 @@ import os
 import glob
 from datetime import datetime as dt
 from datetime import timezone
+from pathlib import Path
 from sys import argv
 
 import pymysql
 import pymysql.cursors
+from dotenv import load_dotenv
 
 
 def log(path, message):
@@ -164,10 +166,29 @@ def main():
     TESTDB= "prod"
 
     # Production Environmental Variables
-    HOST= "[redacted]"
-    USER= "[redacted]"
-    PASSWD= "[redacted]"
-    DB= "[readacted]"
+    REPO_ROOT = Path(__file__).resolve().parents[2]
+    ENV_FILE = os.environ.get("PSWS_ENV_FILE", REPO_ROOT / "deploy/env/psws.env")
+    load_dotenv(dotenv_path=ENV_FILE, override=False)
+
+    HOST= os.getenv("PSWS_DB_HOST")
+    USER= os.getenv("PSWS_DB_USER")
+    PASSWD= os.getenv("PSWS_DB_PASSWORD")
+    DB= os.getenv("PSWS_DB_NAME")
+
+    missing_env = [
+        name
+        for name, value in {
+            "PSWS_DB_HOST": HOST,
+            "PSWS_DB_USER": USER,
+            "PSWS_DB_PASSWORD": PASSWD,
+            "PSWS_DB_NAME": DB,
+        }.items()
+        if not value
+    ]
+    if missing_env:
+        print("Error: Missing required environment variable(s): " + ", ".join(missing_env))
+        print("Set them in " + str(ENV_FILE) + " or export PSWS_ENV_FILE to another env file.")
+        return
 
     # Other Environmental Variables
     PSWS_DB= load_db(HOST, USER, PASSWD, DB)
