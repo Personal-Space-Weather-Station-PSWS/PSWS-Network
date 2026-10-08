@@ -58,6 +58,6 @@ sqlparse==0.6.0
 tqdm==4.67.1
 typing_extensions==4.15.0
 tzdata==2025.2
-urllib3==2.7.0
+urllib3==2.8.0
 watchdog==6.0.0
 xarray==2025.9.1
