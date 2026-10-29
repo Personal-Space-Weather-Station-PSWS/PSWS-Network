@@ -41,7 +41,7 @@ def parse_instrument_from_trigger(trigger_path):
     instrument_part = leaf.split("_#", 1)[1]
 
     if "_#" in instrument_part:
-        instrument_id, timestamp = instrument_part.split("_#", 1)
+        instrument_id, timestamp = instrument_part.split("_#", 2)  # hotfix - changed 1 to 2 for correct instr. selection WDE
         return instrument_id, timestamp or None
 
     match = TRIGGER_TIMESTAMP_SUFFIX_RE.search(instrument_part)
