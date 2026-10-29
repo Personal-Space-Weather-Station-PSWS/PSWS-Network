@@ -80,6 +80,18 @@
     #legend div {
         margin-bottom: 5px;
     }
+
+    .retired-station-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 20px 20px;
+    }
+
+    .retired-station-control label {
+        margin-bottom: 0;
+        cursor: pointer;
+    }
 </style>
 
 <!-- Map container to hold the map and ensure it respects header space -->
@@ -89,6 +101,12 @@
             <h4 style="margin: 0 0 10px; font-weight: bold;"><a href="/about#legend-info">Legend</a></h4>
         </div>
     </div>
+</div>
+
+<!-- Retired stations are hidden until the user selects this checkbox. -->
+<div class="retired-station-control">
+    <input type="checkbox" id="show-retired-stations" autocomplete="off">
+    <label for="show-retired-stations">Show Retired Stations</label>
 </div>
 
 <script>
@@ -218,15 +236,27 @@
 		  {% endfor %}
 	  ]
   };
-  // add markers to map
+  // Create the retired markers, but do not display them initially.
+  const retiredMarkers = [];
   geojson_retired.features.forEach(function(marker) {
-	//var el = document.createElement('div');
-	//el.className = 'marker-light-red';
-	  new mapboxgl.Marker({ color: "#808080", scale: .5 })//el)
-	  .setLngLat(marker.geometry.coordinates)
-	  .setPopup(new mapboxgl.Popup({ offset: 25 })
-	  .setHTML('<h3><a href="' + marker.properties.URL + marker.properties.ID + '">' + marker.properties.title + '</a></h3>'))
-	  .addTo(map);
+      const retiredMarker = new mapboxgl.Marker({ color: "#808080", scale: .5 })
+          .setLngLat(marker.geometry.coordinates)
+          .setPopup(new mapboxgl.Popup({ offset: 25 })
+              .setHTML('<h3><a href="' + marker.properties.URL + marker.properties.ID + '">' + marker.properties.title + '</a></h3>'));
+      retiredMarkers.push(retiredMarker);
+  });
+
+  // Show or hide retired stations immediately when the checkbox changes.
+  const showRetiredCheckbox = document.getElementById('show-retired-stations');
+  showRetiredCheckbox.checked = false;
+  showRetiredCheckbox.addEventListener('change', function() {
+      retiredMarkers.forEach(function(retiredMarker) {
+          if (showRetiredCheckbox.checked) {
+              retiredMarker.addTo(map);
+          } else {
+              retiredMarker.remove();
+          }
+      });
   });
 
   map.on('load', () => {
